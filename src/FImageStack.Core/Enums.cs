@@ -38,9 +38,17 @@ public enum FusionMethod
     WinnerTakesAll,
     FocusWeighted,
     ConfidenceWeighted,
+    OcclusionAware,
     MultiScalePyramid,
     WaveletDWT,
     HDRFocusExposure
+}
+
+public enum OcclusionState : byte
+{
+    Visible = 0,    // Unoccluded, in-focus sharp
+    Occluded = 1,   // Obscured by foreground defocus blur / foreground object
+    Revealed = 2    // Background revealed / newly disoccluded
 }
 
 public enum ArtifactType
