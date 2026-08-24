@@ -242,6 +242,7 @@ public sealed class StackService : IStackService
                 FusionMethod.OcclusionAware => new OcclusionAwareFusionEngine(),
                 FusionMethod.WaveletDWT => new WaveletFusionEngine(),
                 FusionMethod.HDRFocusExposure => new ExposureFusionEngine(),
+                FusionMethod.RegionAdaptive => new RegionAdaptiveFusionEngine(),
                 _ => new MultiScalePyramidFusionEngine()
             };
 

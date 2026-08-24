@@ -41,7 +41,15 @@ public enum FusionMethod
     OcclusionAware,
     MultiScalePyramid,
     WaveletDWT,
-    HDRFocusExposure
+    HDRFocusExposure,
+    RegionAdaptive
+}
+
+public enum SemanticRegionType : byte
+{
+    SmoothBackground = 0,
+    SolidSubject = 1,
+    FineEdgeHair = 2
 }
 
 public enum OcclusionState : byte
