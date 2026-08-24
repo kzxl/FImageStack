@@ -32,6 +32,7 @@ public sealed class StackFrame : IDisposable
     public double SharpnessScore { get; set; }
     public double AlignmentConfidence { get; set; } = 1.0;
     public float PriorityWeight { get; set; } = 1.0f;
+    public float FocusBreathingScale { get; set; } = 1.0f;
 
     public void Dispose()
     {

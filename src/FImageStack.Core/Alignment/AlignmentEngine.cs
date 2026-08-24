@@ -50,6 +50,13 @@ public interface IAlignmentEngine
 
 public sealed class AdvancedAlignmentEngine : IAlignmentEngine
 {
+    private readonly IFocusBreathingEstimator _focusBreathingEstimator;
+
+    public AdvancedAlignmentEngine(IFocusBreathingEstimator? focusBreathingEstimator = null)
+    {
+        _focusBreathingEstimator = focusBreathingEstimator ?? new FocusBreathingEstimator();
+    }
+
     public unsafe void AlignStack(
         IList<StackFrame> frames,
         AlignmentMode mode = AlignmentMode.Similarity,
@@ -66,6 +73,13 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
         int width = refFrame.Width;
         int height = refFrame.Height;
 
+        // Stage 0: Global Focus Breathing Scale Curve Estimation
+        if (correctFocusBreathing && (mode == AlignmentMode.Similarity || mode == AlignmentMode.Affine || mode == AlignmentMode.Homography))
+        {
+            var breathingResult = _focusBreathingEstimator.EstimateScaleCurve(frames, refIndex);
+            progress?.Report(new StackProgress("Auto Alignment", 5.0, $"Focus Breathing Curve: ΔM={breathingResult.TotalMagnificationShiftPercentage:+0.00;-0.00}%, R²={breathingResult.R2:F2}"));
+        }
+
         for (int i = 0; i < count; i++)
         {
             if (i == refIndex)
@@ -77,7 +91,7 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
 
             var targetFrame = frames[i];
 
-            // 1. Stage 1: Global Alignment
+            // 1. Stage 1: Global Alignment with Breathing Scale Compensation
             var transform = EstimateTransform(refFrame, targetFrame, mode, correctFocusBreathing);
 
             if (MathF.Abs(transform.Dx) > 0.05f || MathF.Abs(transform.Dy) > 0.05f ||
@@ -94,7 +108,7 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
             }
 
             targetFrame.AlignmentConfidence = transform.Confidence;
-            progress?.Report(new StackProgress("Auto Alignment", (double)(i + 1) / count * 100, $"Aligned frame #{i + 1} ({mode}, dx:{transform.Dx:F1}, dy:{transform.Dy:F1}{(enableLocalAlignment ? ", Local Elastic Mesh" : "")})"));
+            progress?.Report(new StackProgress("Auto Alignment", (double)(i + 1) / count * 100, $"Aligned frame #{i + 1} ({mode}, dx:{transform.Dx:F1}, dy:{transform.Dy:F1}{(correctFocusBreathing ? $", scale:{transform.ScaleX * 100f:F1}%" : "")}{(enableLocalAlignment ? ", Local Mesh" : "")})"));
         }
     }
 
@@ -180,10 +194,9 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
 
             if (correctFocusBreathing && (mode == AlignmentMode.Similarity || mode == AlignmentMode.Affine || mode == AlignmentMode.Homography))
             {
-                float dFrame = (float)(targetFrame.Index - refFrame.Index);
-                float estimatedScale = 1.0f + dFrame * 0.0008f;
-                transform.ScaleX = estimatedScale;
-                transform.ScaleY = estimatedScale;
+                float breathingScale = targetFrame.FocusBreathingScale > 0.01f ? targetFrame.FocusBreathingScale : 1.0f;
+                transform.ScaleX = breathingScale;
+                transform.ScaleY = breathingScale;
             }
 
             transform.Affine[0] = transform.ScaleX;
