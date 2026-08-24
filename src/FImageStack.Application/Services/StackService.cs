@@ -9,6 +9,7 @@ using FImageStack.Core.Models;
 using FImageStack.Core.Motion;
 using FImageStack.Core.Quality;
 using FImageStack.Core.Reconstruction;
+using FImageStack.Core.SuperResolution;
 using FImageStack.Core.Tiling;
 using FImageStack.Infrastructure.IO;
 using StackFrame = FImageStack.Core.Models.StackFrame;
@@ -36,6 +37,7 @@ public sealed class StackService : IStackService
     private readonly IEdgeFusionEngine _edgeFusionEngine;
     private readonly ITiledProcessor _tiledProcessor;
     private readonly ITemporalDenoiseEngine _temporalDenoiseEngine;
+    private readonly IMultiFrameSuperResolutionEngine _superResolutionEngine;
 
     public StackService(
         IImageIO imageIO,
@@ -47,7 +49,8 @@ public sealed class StackService : IStackService
         IAutoRepairEngine? autoRepairEngine = null,
         IEdgeFusionEngine? edgeFusionEngine = null,
         ITiledProcessor? tiledProcessor = null,
-        ITemporalDenoiseEngine? temporalDenoiseEngine = null)
+        ITemporalDenoiseEngine? temporalDenoiseEngine = null,
+        IMultiFrameSuperResolutionEngine? superResolutionEngine = null)
     {
         _imageIO = imageIO;
         _alignmentEngine = alignmentEngine ?? new AdvancedAlignmentEngine();
@@ -59,6 +62,7 @@ public sealed class StackService : IStackService
         _edgeFusionEngine = edgeFusionEngine ?? new EdgeFusionEngine();
         _tiledProcessor = tiledProcessor ?? new StandardTiledProcessor();
         _temporalDenoiseEngine = temporalDenoiseEngine ?? new TemporalDenoiseEngine();
+        _superResolutionEngine = superResolutionEngine ?? new MultiFrameSuperResolutionEngine();
     }
 
     public async Task<ProcessedStackResult> ProcessStackAsync(
@@ -201,6 +205,18 @@ public sealed class StackService : IStackService
             progress?.Report(new StackProgress("Focus Fusion", 100, "Fusion complete."));
             sw.Stop();
             benchmark.FusionTimeMs = sw.Elapsed.TotalMilliseconds;
+
+            // 7.5 Multi-Frame Super-Resolution (MFSR)
+            if (settings.EnableSuperResolution && result.FusedImage != null)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                sw.Restart();
+                progress?.Report(new StackProgress("Super Resolution", 0, $"Reconstructing {settings.SuperResolutionParams.ScaleFactor}x Super-Resolution image..."));
+                var hrImage = await Task.Run(() => _superResolutionEngine.ReconstructSuperResolution(frames, result.FusedImage, settings.SuperResolutionParams, progress), cancellationToken);
+                result.FusedImage.Dispose();
+                result.FusedImage = hrImage;
+                sw.Stop();
+            }
 
             // 8. Artifact Detection (Phase 7)
             if (settings.EnableArtifactDetection)
