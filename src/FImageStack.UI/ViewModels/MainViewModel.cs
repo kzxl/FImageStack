@@ -58,6 +58,20 @@ public sealed class PixelInspectorInfo : ViewModelBase
         }
     }
     public bool HasFocusCurve => !string.IsNullOrEmpty(_focusCurveSummary);
+
+    private string _confidenceBreakdownText = string.Empty;
+    public string ConfidenceBreakdownText
+    {
+        get => _confidenceBreakdownText;
+        set
+        {
+            if (SetProperty(ref _confidenceBreakdownText, value))
+            {
+                OnPropertyChanged(nameof(HasConfidenceBreakdown));
+            }
+        }
+    }
+    public bool HasConfidenceBreakdown => !string.IsNullOrEmpty(_confidenceBreakdownText);
 }
 
 public sealed class ArtifactRegionViewModel : ViewModelBase
@@ -906,6 +920,17 @@ public sealed class MainViewModel : ViewModelBase
             curveSummary = sb.ToString();
         }
 
+        string breakdownText = $"Sharpness: {conf:F2} | Conf: {conf * 100f:F0}%";
+        if (depthRes.FocusVolume != null)
+        {
+            float s = conf;
+            float a = Math.Clamp(1.0f - MathF.Abs(depthZ - (float)frameIdx / Math.Max(1, Frames.Count - 1)), 0.1f, 1.0f);
+            float m = _lastResult.MotionResult?.MotionMap != null ? _lastResult.MotionResult.MotionMap.DataPointer[idx] : 0f;
+            float e = Math.Clamp(s * 1.1f, 0.2f, 1.0f);
+            float total = s * (0.35f + 0.65f * a) * (0.2f + 0.8f * (1f - Math.Clamp(m * 1.5f, 0f, 0.95f))) * (0.4f + 0.6f * e);
+            breakdownText = $"Sharpness: {s:F2}  |  Alignment: {a:F2}  |  Motion: {m:F2}  |  Edge: {e:F2}  =>  Confidence: {total:F2}";
+        }
+
         InspectorInfo = new PixelInspectorInfo
         {
             PixelX = x,
@@ -918,7 +943,8 @@ public sealed class MainViewModel : ViewModelBase
             ConfidencePercentage = conf * 100f,
             IsValidFocus = isValid,
             StatusBadge = isValid ? "✅ In-Focus" : (isGap ? "⚠️ Focus Gap" : "⚠️ Bokeh / Low Texture"),
-            FocusCurveSummary = curveSummary
+            FocusCurveSummary = curveSummary,
+            ConfidenceBreakdownText = breakdownText
         };
     }
 

@@ -234,6 +234,10 @@
                                 <Run Text="Focus Volume Profile: " Foreground="{StaticResource PrimaryAccent}" FontWeight="SemiBold" />
                                 <Run Text="{Binding InspectorInfo.FocusCurveSummary, Mode=OneWay}" Foreground="#E2E8F0" FontFamily="Consolas, Monospace" />
                             </TextBlock>
+                            <TextBlock Margin="0,2,0,0" Foreground="{StaticResource TextMuted}" FontSize="11" Visibility="{Binding InspectorInfo.HasConfidenceBreakdown, Converter={StaticResource BoolToVis}}">
+                                <Run Text="Multi-Factor Confidence: " Foreground="{StaticResource SuccessAccent}" FontWeight="SemiBold" />
+                                <Run Text="{Binding InspectorInfo.ConfidenceBreakdownText, Mode=OneWay}" Foreground="#E2E8F0" FontFamily="Consolas, Monospace" />
+                            </TextBlock>
                         </StackPanel>
                     </Border>
                 </Grid>

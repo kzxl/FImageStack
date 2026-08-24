@@ -36,6 +36,7 @@ public enum FusionMethod
 {
     WinnerTakesAll,
     FocusWeighted,
+    ConfidenceWeighted,
     MultiScalePyramid,
     WaveletDWT,
     HDRFocusExposure

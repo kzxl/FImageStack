@@ -166,6 +166,7 @@ public sealed class StackService : IStackService
             {
                 FusionMethod.WinnerTakesAll => new WinnerTakesAllFusionEngine(),
                 FusionMethod.FocusWeighted => new FocusWeightedFusionEngine(),
+                FusionMethod.ConfidenceWeighted => new ConfidenceWeightedFusionEngine(),
                 FusionMethod.WaveletDWT => new WaveletFusionEngine(),
                 FusionMethod.HDRFocusExposure => new ExposureFusionEngine(),
                 _ => new MultiScalePyramidFusionEngine()
