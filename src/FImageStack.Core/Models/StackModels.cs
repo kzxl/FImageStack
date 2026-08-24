@@ -140,6 +140,7 @@ public sealed class FusionSettings
     public float DenoiseStrength { get; set; } = 1.0f;
     public bool EnableSuperResolution { get; set; } = false;
     public SuperResolution.SuperResolutionParams SuperResolutionParams { get; set; } = new();
+    public bool EnableAutoFrameSelection { get; set; } = false;
 
     public ResolutionMode RenderMode { get; set; } = ResolutionMode.FastPreview1280;
     public int PreviewMaxDimension { get; set; } = 1280;

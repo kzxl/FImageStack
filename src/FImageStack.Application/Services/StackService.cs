@@ -38,6 +38,7 @@ public sealed class StackService : IStackService
     private readonly ITiledProcessor _tiledProcessor;
     private readonly ITemporalDenoiseEngine _temporalDenoiseEngine;
     private readonly IMultiFrameSuperResolutionEngine _superResolutionEngine;
+    private readonly IOptimalFrameRangeSelector _optimalRangeSelector;
 
     public StackService(
         IImageIO imageIO,
@@ -50,7 +51,8 @@ public sealed class StackService : IStackService
         IEdgeFusionEngine? edgeFusionEngine = null,
         ITiledProcessor? tiledProcessor = null,
         ITemporalDenoiseEngine? temporalDenoiseEngine = null,
-        IMultiFrameSuperResolutionEngine? superResolutionEngine = null)
+        IMultiFrameSuperResolutionEngine? superResolutionEngine = null,
+        IOptimalFrameRangeSelector? optimalRangeSelector = null)
     {
         _imageIO = imageIO;
         _alignmentEngine = alignmentEngine ?? new AdvancedAlignmentEngine();
@@ -63,6 +65,7 @@ public sealed class StackService : IStackService
         _tiledProcessor = tiledProcessor ?? new StandardTiledProcessor();
         _temporalDenoiseEngine = temporalDenoiseEngine ?? new TemporalDenoiseEngine();
         _superResolutionEngine = superResolutionEngine ?? new MultiFrameSuperResolutionEngine();
+        _optimalRangeSelector = optimalRangeSelector ?? new OptimalFrameRangeSelector();
     }
 
     public async Task<ProcessedStackResult> ProcessStackAsync(
@@ -104,6 +107,33 @@ public sealed class StackService : IStackService
 
         try
         {
+            // 1.5 Automatic Optimal Frame Range (Frame Culling)
+            if (settings.EnableAutoFrameSelection && frames.Count > 3)
+            {
+                progress?.Report(new StackProgress("Frame Selection", 0, "Analyzing focus envelope & culling outliers..."));
+                var rangeResult = _optimalRangeSelector.AnalyzeOptimalRange(frames);
+                progress?.Report(new StackProgress("Frame Selection", 100, rangeResult.Summary));
+
+                if (rangeResult.SelectedIndices.Count >= 2 && rangeResult.SelectedIndices.Count < frames.Count)
+                {
+                    var selectedFrames = new List<StackFrame>(rangeResult.SelectedIndices.Count);
+                    var selectedSet = new HashSet<int>(rangeResult.SelectedIndices);
+
+                    for (int i = 0; i < frames.Count; i++)
+                    {
+                        if (selectedSet.Contains(i))
+                        {
+                            selectedFrames.Add(frames[i]);
+                        }
+                        else
+                        {
+                            frames[i].Dispose();
+                        }
+                    }
+                    frames = selectedFrames;
+                }
+            }
+
             // 2. Alignment & Sub-Pixel Warp
             cancellationToken.ThrowIfCancellationRequested();
             sw.Restart();
