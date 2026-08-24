@@ -214,8 +214,8 @@ public sealed class StackService : IStackService
 
             if (settings.EnableTiledProcessing)
             {
-                progress?.Report(new StackProgress("Tiled Fusion", 0, $"Fusing in {settings.TileSize}x{settings.TileSize} tiles..."));
-                result.FusedImage = await Task.Run(() => _tiledProcessor.ProcessTiled(frames, result.DepthResult, fusionEngine, settings, settings.TileSize), cancellationToken);
+                progress?.Report(new StackProgress("Tiled Fusion", 0, $"Fusing in {settings.TileSize}x{settings.TileSize} memory-bounded tiles..."));
+                result.FusedImage = await Task.Run(() => _tiledProcessor.ProcessTiled(frames, result.DepthResult, fusionEngine, settings, settings.TileSize, 64, progress), cancellationToken);
             }
             else
             {

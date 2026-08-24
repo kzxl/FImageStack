@@ -22,8 +22,9 @@ public interface ITiledProcessor
         DepthMapResult depthResult,
         IFusionEngine fusionEngine,
         FusionSettings settings,
-        int tileSize = 512,
-        int overlapMargin = 32);
+        int tileSize = 4096,
+        int overlapMargin = 64,
+        IProgress<StackProgress>? progress = null);
 }
 
 public sealed class StandardTiledProcessor : ITiledProcessor
@@ -33,8 +34,9 @@ public sealed class StandardTiledProcessor : ITiledProcessor
         DepthMapResult depthResult,
         IFusionEngine fusionEngine,
         FusionSettings settings,
-        int tileSize = 512,
-        int overlapMargin = 32)
+        int tileSize = 4096,
+        int overlapMargin = 64,
+        IProgress<StackProgress>? progress = null)
     {
         int fullW = depthResult.Width;
         int fullH = depthResult.Height;
@@ -45,8 +47,8 @@ public sealed class StandardTiledProcessor : ITiledProcessor
         float* outPtr = fullOutput.DataPointer;
         float* weightPtr = weightAccumulator.DataPointer;
 
-        int stepX = tileSize - overlapMargin * 2;
-        int stepY = tileSize - overlapMargin * 2;
+        int stepX = Math.Max(1, tileSize - overlapMargin * 2);
+        int stepY = Math.Max(1, tileSize - overlapMargin * 2);
 
         var tileSpecs = new List<TileSpecification>();
         int tileIdx = 0;
@@ -73,9 +75,12 @@ public sealed class StandardTiledProcessor : ITiledProcessor
             }
         }
 
-        // Process each tile
-        foreach (var tile in tileSpecs)
+        // Process each tile sequentially to maintain bounded RAM usage
+        for (int i = 0; i < tileSpecs.Count; i++)
         {
+            var tile = tileSpecs[i];
+            progress?.Report(new StackProgress("Tiled Fusion", (double)(i + 1) / tileSpecs.Count * 100, $"Processing Tile {i + 1}/{tileSpecs.Count} ({tile.Width}x{tile.Height} at X:{tile.X}, Y:{tile.Y})..."));
+
             // Extract tile frames
             var tileFrames = new List<StackFrame>(frames.Count);
             for (int f = 0; f < frames.Count; f++)
@@ -101,13 +106,13 @@ public sealed class StandardTiledProcessor : ITiledProcessor
             CopyCrop(depthResult.DepthMap, tDepth.DepthMap, tile.X, tile.Y, tile.Width, tile.Height);
             CopyCrop(depthResult.ConfidenceMap, tDepth.ConfidenceMap, tile.X, tile.Y, tile.Width, tile.Height);
 
-            // Fuse the tile
+            // Fuse the tile with chosen engine
             using var fusedTile = fusionEngine.Fuse(tileFrames, tDepth, settings);
 
-            // Accumulate tile with boundary cosine feathering
+            // Accumulate tile with boundary Cosine Hanning feathering to eliminate seams
             AccumulateTile(fusedTile, fullOutput, weightAccumulator, tile);
 
-            // Clean up tile buffers
+            // Immediately dispose tile buffers to release memory
             foreach (var tf in tileFrames) tf.Dispose();
             tDepth.Dispose();
         }
@@ -161,7 +166,7 @@ public sealed class StandardTiledProcessor : ITiledProcessor
                 if (tx < margin) wx = 0.5f * (1.0f - MathF.Cos((float)tx / margin * MathF.PI));
                 else if (tx > tW - 1 - margin) wx = 0.5f * (1.0f - MathF.Cos((float)(tW - 1 - tx) / margin * MathF.PI));
 
-                float weight = wx * wy;
+                float weight = MathF.Max(0.001f, wx * wy);
                 int gIdx = gy * fullW + gx;
                 int tIdx = ty * tW + tx;
 

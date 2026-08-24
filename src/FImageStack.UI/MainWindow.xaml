@@ -4,6 +4,7 @@
         xmlns:vm="clr-namespace:FImageStack.UI.ViewModels"
         xmlns:core="clr-namespace:FImageStack.Core;assembly=FImageStack.Core"
         xmlns:retouch="clr-namespace:FImageStack.Core.Retouch;assembly=FImageStack.Core"
+        xmlns:sys="clr-namespace:System;assembly=System.Runtime"
         Title="FImageStack Pro — Intelligent Focus Fusion Engine"
         Height="950" Width="1480"
         MinHeight="700" MinWidth="1100"
@@ -345,7 +346,17 @@
                                 <CheckBox Content="Edge Discontinuity Reconstruction" IsChecked="{Binding EnableEdgeReconstruction}" ToolTip="Seamlessly reconstructs jagged, sheared or broken contour edges from best source frames" />
                                 <CheckBox Content="Stack Quality &amp; Gap Analyzer" IsChecked="{Binding EnableQualityAnalysis}" ToolTip="Evaluates focus coverage and alerts missing focal planes" />
                                 <CheckBox Content="Artifact Detection &amp; Auto-Repair" IsChecked="{Binding EnableArtifactDetection}" ToolTip="Detects halos/seams and seamlessly patches from best source frames" />
-                                <CheckBox Content="Bounded Tiled Processing (Large RAM)" IsChecked="{Binding EnableTiledProcessing}" ToolTip="Tiles image for memory bounded execution" />
+                                <CheckBox Content="Memory-Bounded Tiled Processing" IsChecked="{Binding EnableTiledProcessing}" ToolTip="Partitions ultra high-res gigapixel sequences (100MP+) into bounded memory tiles" />
+
+                                <StackPanel Visibility="{Binding EnableTiledProcessing, Converter={StaticResource BoolToVis}}" Margin="20,4,0,0">
+                                    <TextBlock Text="Tile Grid Block Size:" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2" />
+                                    <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding TileSize}" Margin="0,0,0,4">
+                                        <ComboBoxItem Content="4096 × 4096 (Gigapixel 100MP+)" Tag="{sys:Int32 4096}" IsSelected="True" />
+                                        <ComboBoxItem Content="2048 × 2048 (Balanced 50MP)" Tag="{sys:Int32 2048}" />
+                                        <ComboBoxItem Content="1024 × 1024 (Low-RAM 16GB)" Tag="{sys:Int32 1024}" />
+                                        <ComboBoxItem Content="512 × 512 (Micro-Bounded 8GB)" Tag="{sys:Int32 512}" />
+                                    </ComboBox>
+                                </StackPanel>
                             </StackPanel>
                         </Border>
 
