@@ -970,7 +970,7 @@ public sealed class MainViewModel : ViewModelBase
             EnableLocalAlignment = EnableLocalAlignment,
             EnableEdgeReconstruction = EnableEdgeReconstruction,
             EnableTiledProcessing = EnableTiledProcessing,
-            TileSize = TileSize,
+            TileSize = _tileSize,
             RenderMode = SelectedRenderMode,
             PreviewMaxDimension = 1280
         };
