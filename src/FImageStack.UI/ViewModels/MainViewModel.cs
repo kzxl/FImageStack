@@ -65,6 +65,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly IImageIO _imageIO;
     private readonly IPostProcessEngine _postProcessEngine;
     private readonly ISmartFrameSelector _frameSelector;
+    private readonly IGpuAccelerationEngine _gpuEngine;
 
     private CancellationTokenSource? _cts;
     private ProcessedStackResult? _lastResult;
@@ -139,6 +140,44 @@ public sealed class MainViewModel : ViewModelBase
 
     public ResolutionMode SelectedRenderMode { get => _selectedRenderMode; set => SetProperty(ref _selectedRenderMode, value); }
     public string ResolutionBadgeText { get => _resolutionBadgeText; set => SetProperty(ref _resolutionBadgeText, value); }
+
+    // Hardware & GPU Acceleration
+    public ObservableCollection<GpuDeviceInfo> AvailableGpuDevices { get; } = new();
+    private GpuDeviceInfo? _selectedGpuDevice;
+    private GpuBackendType _selectedGpuBackend = GpuBackendType.Auto;
+    private string _gpuStatusBadgeText = "⚡ DIRECTCOMPUTE GPU ACTIVE";
+
+    public GpuDeviceInfo? SelectedGpuDevice
+    {
+        get => _selectedGpuDevice;
+        set
+        {
+            if (SetProperty(ref _selectedGpuDevice, value) && value != null)
+            {
+                _gpuEngine.SetActiveBackend(value.Backend);
+                GpuStatusBadgeText = value.IsHardwareAccelerated
+                    ? $"⚡ {value.Backend.ToString().ToUpper()} GPU ACCELERATED"
+                    : "💻 CPU AVX2 SIMD ACTIVE";
+            }
+        }
+    }
+
+    public GpuBackendType SelectedGpuBackend
+    {
+        get => _selectedGpuBackend;
+        set
+        {
+            if (SetProperty(ref _selectedGpuBackend, value))
+            {
+                _gpuEngine.SetActiveBackend(value);
+                GpuStatusBadgeText = value != GpuBackendType.CpuSimd
+                    ? $"⚡ {value.ToString().ToUpper()} ACCELERATED"
+                    : "💻 CPU AVX2 SIMD ACTIVE";
+            }
+        }
+    }
+
+    public string GpuStatusBadgeText { get => _gpuStatusBadgeText; set => SetProperty(ref _gpuStatusBadgeText, value); }
 
     // Advanced 6-Metric Quality Analyzer
     private double _metricAlignmentScore = 98.0;
@@ -570,6 +609,13 @@ public sealed class MainViewModel : ViewModelBase
         _stackService = new StackService(_imageIO);
         _postProcessEngine = new StandardPostProcessEngine();
         _frameSelector = new SmartFrameSelector();
+        _gpuEngine = new StandardGpuAccelerationEngine();
+
+        foreach (var dev in _gpuEngine.GetAvailableDevices())
+        {
+            AvailableGpuDevices.Add(dev);
+        }
+        _selectedGpuDevice = AvailableGpuDevices.FirstOrDefault(d => d.IsHardwareAccelerated) ?? AvailableGpuDevices[0];
 
         foreach (var p in StackingPreset.GetBuiltinPresets())
         {

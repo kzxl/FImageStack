@@ -72,3 +72,12 @@ public enum ResolutionMode
     FastPreview1280, // Fast interactive proxy stack (1280px / ~0.2s-0.5s)
     FullMaster       // 100% full sensor resolution (24MP - 100MP+)
 }
+
+public enum GpuBackendType
+{
+    Auto,           // Optimal hardware selection (DirectCompute / DirectML / CPU)
+    DirectCompute,  // DirectX 11/12 HLSL Compute Shader (NVIDIA, AMD, Intel)
+    DirectML,       // DirectX Machine Learning Accelerator
+    Cuda,           // NVIDIA CUDA Engine
+    CpuSimd         // CPU Multi-threaded AVX2/AVX-512 SIMD Fallback
+}

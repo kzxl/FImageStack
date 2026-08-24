@@ -349,7 +349,28 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 5. Post-Processing & Clarity Card -->
+                        <!-- 5. Hardware & GPU Acceleration Card -->
+                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <TextBlock Text="⚡ HARDWARE &amp; GPU ACCELERATION" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
+                                    <Border Background="#1E293B" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="3" Padding="6,1" HorizontalAlignment="Right">
+                                        <TextBlock Text="{Binding GpuStatusBadgeText}" Foreground="#38BDF8" FontWeight="Bold" FontSize="9" />
+                                    </Border>
+                                </Grid>
+
+                                <TextBlock Text="Compute Engine / Accelerator:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,4" />
+                                <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedGpuBackend}" Margin="0,0,0,4">
+                                    <ComboBoxItem Content="Auto (DirectCompute / DirectML Fast)" Tag="{x:Static core:GpuBackendType.Auto}" IsSelected="True" />
+                                    <ComboBoxItem Content="DirectCompute (DirectX 12 Shader)" Tag="{x:Static core:GpuBackendType.DirectCompute}" />
+                                    <ComboBoxItem Content="DirectML (Neural &amp; Tensor Core)" Tag="{x:Static core:GpuBackendType.DirectML}" />
+                                    <ComboBoxItem Content="NVIDIA CUDA Hardware Stream" Tag="{x:Static core:GpuBackendType.Cuda}" />
+                                    <ComboBoxItem Content="CPU Multi-Thread AVX2 SIMD" Tag="{x:Static core:GpuBackendType.CpuSimd}" />
+                                </ComboBox>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 6. Post-Processing & Clarity Card -->
                         <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                             <StackPanel>
                                 <Grid Margin="0,0,0,8">
