@@ -8,3 +8,4 @@ data/
 *.tiff
 .vs/
 .idea/
+publish/
