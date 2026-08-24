@@ -3,12 +3,13 @@ using FImageStack.Core.Models;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Tiff;
 using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 
 namespace FImageStack.Infrastructure.IO;
 
 public interface IImageIO
 {
-    StackFrame LoadFrame(string filePath, int index);
+    StackFrame LoadFrame(string filePath, int index, int maxDimension = 0);
     void SaveImage(ImageBuffer<float> buffer, string outputPath, int bitDepth = 8);
 }
 
@@ -21,7 +22,7 @@ public sealed class ImageSharpIO : IImageIO
         _rawDecoder = rawDecoder ?? new RawDecoderEngine();
     }
 
-    public unsafe StackFrame LoadFrame(string filePath, int index)
+    public unsafe StackFrame LoadFrame(string filePath, int index, int maxDimension = 0)
     {
         if (!File.Exists(filePath))
             throw new FileNotFoundException("Image file not found.", filePath);
@@ -29,7 +30,7 @@ public sealed class ImageSharpIO : IImageIO
         // Native RAW Decoder Flow
         if (_rawDecoder.IsRawFile(filePath))
         {
-            var rawColor = _rawDecoder.LoadRawImage(filePath);
+            var rawColor = _rawDecoder.LoadRawImage(filePath, maxDimension);
             int rw = rawColor.Width;
             int rh = rawColor.Height;
 
@@ -62,6 +63,16 @@ public sealed class ImageSharpIO : IImageIO
 
         // Standard Image Loading (JPEG, PNG, TIFF)
         using var image = Image.Load<Rgb24>(filePath);
+
+        if (maxDimension > 0 && (image.Width > maxDimension || image.Height > maxDimension))
+        {
+            image.Mutate(x => x.Resize(new ResizeOptions
+            {
+                Size = new Size(maxDimension, maxDimension),
+                Mode = ResizeMode.Max
+            }));
+        }
+
         int width = image.Width;
         int height = image.Height;
 

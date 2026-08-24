@@ -20,7 +20,7 @@ public interface IRawDecoderEngine
 {
     bool IsRawFile(string filePath);
     ImageBuffer<float> DemosaicBayerCfa(ReadOnlySpan<ushort> cfaData, RawFrameMetadata metadata);
-    ImageBuffer<float> LoadRawImage(string filePath);
+    ImageBuffer<float> LoadRawImage(string filePath, int maxDimension = 0);
 }
 
 public sealed class RawDecoderEngine : IRawDecoderEngine
@@ -145,7 +145,7 @@ public sealed class RawDecoderEngine : IRawDecoderEngine
         return output;
     }
 
-    public ImageBuffer<float> LoadRawImage(string filePath)
+    public ImageBuffer<float> LoadRawImage(string filePath, int maxDimension = 0)
     {
         var bytes = File.ReadAllBytes(filePath);
         int totalUshorts = bytes.Length / 2;
@@ -153,7 +153,12 @@ public sealed class RawDecoderEngine : IRawDecoderEngine
         int width = 1024;
         int height = 1024;
 
-        if (totalUshorts >= 4096 * 3072) { width = 4096; height = 3072; }
+        if (maxDimension > 0)
+        {
+            width = Math.Min(1280, maxDimension);
+            height = Math.Min(1280, maxDimension);
+        }
+        else if (totalUshorts >= 4096 * 3072) { width = 4096; height = 3072; }
         else if (totalUshorts >= 3840 * 2160) { width = 3840; height = 2160; }
         else if (totalUshorts >= 1920 * 1080) { width = 1920; height = 1080; }
 

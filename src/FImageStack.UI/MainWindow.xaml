@@ -157,18 +157,25 @@
 
                 <!-- Multi-view Tab Headers -->
                 <Border Grid.Row="0" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="12,4,12,0">
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
-                        <StackPanel Orientation="Horizontal">
-                            <RadioButton Content="✨ Fused Output" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsFusedTabSelected}" GroupName="ViewTabs" />
-                            <RadioButton Content="⚡ A/B Split View" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsSplitTabSelected}" GroupName="ViewTabs" ToolTip="Side-by-side comparison slider between Fused output and Selected frame" />
-                            <RadioButton Content="🌈 Turbo Depth 3D" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsDepthTabSelected}" GroupName="ViewTabs" ToolTip="Thermal pseudo-color map (Near=Red, Far=Blue)" />
-                            <RadioButton Content="🎯 Confidence Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsConfidenceTabSelected}" GroupName="ViewTabs" />
-                            <RadioButton Content="🚫 Invalid &amp; Gaps" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsInvalidTabSelected}" GroupName="ViewTabs" ToolTip="Out-of-focus background and missing focus planes" />
-                            <RadioButton Content="🍃 Motion Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsMotionTabSelected}" GroupName="ViewTabs" />
-                            <RadioButton Content="🛡️ Artifacts &amp; Repair" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsArtifactTabSelected}" GroupName="ViewTabs" />
-                            <RadioButton Content="🖼️ Source Frame" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsSourceTabSelected}" GroupName="ViewTabs" />
-                        </StackPanel>
-                    </ScrollViewer>
+                    <Grid>
+                        <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" Margin="0,0,180,0">
+                            <StackPanel Orientation="Horizontal">
+                                <RadioButton Content="✨ Fused Output" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsFusedTabSelected}" GroupName="ViewTabs" />
+                                <RadioButton Content="⚡ A/B Split View" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsSplitTabSelected}" GroupName="ViewTabs" ToolTip="Side-by-side comparison slider between Fused output and Selected frame" />
+                                <RadioButton Content="🌈 Turbo Depth 3D" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsDepthTabSelected}" GroupName="ViewTabs" ToolTip="Thermal pseudo-color map (Near=Red, Far=Blue)" />
+                                <RadioButton Content="🎯 Confidence Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsConfidenceTabSelected}" GroupName="ViewTabs" />
+                                <RadioButton Content="🚫 Invalid &amp; Gaps" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsInvalidTabSelected}" GroupName="ViewTabs" ToolTip="Out-of-focus background and missing focus planes" />
+                                <RadioButton Content="🍃 Motion Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsMotionTabSelected}" GroupName="ViewTabs" />
+                                <RadioButton Content="🛡️ Artifacts &amp; Repair" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsArtifactTabSelected}" GroupName="ViewTabs" />
+                                <RadioButton Content="🖼️ Source Frame" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsSourceTabSelected}" GroupName="ViewTabs" />
+                            </StackPanel>
+                        </ScrollViewer>
+
+                        <!-- Resolution Proxy Badge -->
+                        <Border HorizontalAlignment="Right" VerticalAlignment="Center" Background="#1E293B" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="4" Padding="8,2" Margin="0,0,0,4">
+                            <TextBlock Text="{Binding ResolutionBadgeText}" Foreground="#38BDF8" FontWeight="Bold" FontSize="11" />
+                        </Border>
+                    </Grid>
                 </Border>
 
                 <!-- Split-Screen Slider Bar -->
@@ -390,8 +397,16 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 6. Primary Action Buttons -->
-                        <Button Content="▶  START FOCUS STACKING" Style="{StaticResource PrimaryActionButton}" Command="{Binding StartStackingCommand}" Margin="0,0,0,8" Height="44" FontSize="14" />
+                        <!-- 6. Dual-Action Preview & Master Render Buttons -->
+                        <Grid Margin="0,0,0,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Button Grid.Column="0" Content="⚡ FAST PREVIEW" Style="{StaticResource PrimaryActionButton}" Command="{Binding StartPreviewStackCommand}" Margin="0,0,3,0" Height="44" FontSize="12" FontWeight="Bold" ToolTip="Instant proxy stack (1280px / 0.3s) for fast parameter tuning &amp; retouching" />
+                            <Button Grid.Column="1" Content="🚀 FULL MASTER" Style="{StaticResource ModernButton}" Command="{Binding StartFullMasterRenderCommand}" Margin="3,0,0,0" Height="44" FontSize="12" FontWeight="Bold" Background="#2E1065" BorderBrush="#8B5CF6" Foreground="#E9D5FF" ToolTip="Full 100% native sensor resolution master render for final output" />
+                        </Grid>
+
                         <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />

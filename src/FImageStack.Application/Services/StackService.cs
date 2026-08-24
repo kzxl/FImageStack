@@ -121,11 +121,12 @@ public sealed class StackService : IStackService
         progress?.Report(new StackProgress("Loading Frames", 0, $"Loading {filePaths.Count} frames..."));
         sw.Restart();
 
+        int maxDim = settings.RenderMode == ResolutionMode.FastPreview1280 ? Math.Max(512, settings.PreviewMaxDimension) : 0;
         var frames = new List<StackFrame>(filePaths.Count);
         for (int i = 0; i < filePaths.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var frame = await Task.Run(() => _imageIO.LoadFrame(filePaths[i], i), cancellationToken);
+            var frame = await Task.Run(() => _imageIO.LoadFrame(filePaths[i], i, maxDim), cancellationToken);
             frames.Add(frame);
             progress?.Report(new StackProgress("Loading Frames", (double)(i + 1) / filePaths.Count * 100, $"Loaded {Path.GetFileName(filePaths[i])}"));
         }

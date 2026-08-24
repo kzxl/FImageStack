@@ -66,3 +66,9 @@ public enum BayerPatternType
     GRBG,
     GBRG
 }
+
+public enum ResolutionMode
+{
+    FastPreview1280, // Fast interactive proxy stack (1280px / ~0.2s-0.5s)
+    FullMaster       // 100% full sensor resolution (24MP - 100MP+)
+}

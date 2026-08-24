@@ -133,6 +133,13 @@ public sealed class MainViewModel : ViewModelBase
     private string _shadowClippingText = "0.0%";
     private string _highlightClippingText = "0.0%";
 
+    // Resolution & Preview Mode
+    private ResolutionMode _selectedRenderMode = ResolutionMode.FastPreview1280;
+    private string _resolutionBadgeText = "⚡ FAST PREVIEW (1280px)";
+
+    public ResolutionMode SelectedRenderMode { get => _selectedRenderMode; set => SetProperty(ref _selectedRenderMode, value); }
+    public string ResolutionBadgeText { get => _resolutionBadgeText; set => SetProperty(ref _resolutionBadgeText, value); }
+
     // Advanced 6-Metric Quality Analyzer
     private double _metricAlignmentScore = 98.0;
     private double _metricFocusCoverageScore = 95.0;
@@ -542,6 +549,8 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand LoadFolderCommand { get; }
     public ICommand LoadSampleStackCommand { get; }
     public ICommand StartStackingCommand { get; }
+    public ICommand StartPreviewStackCommand { get; }
+    public ICommand StartFullMasterRenderCommand { get; }
     public ICommand CancelStackingCommand { get; }
     public ICommand ExportResultCommand { get; }
     public ICommand SelectAllFramesCommand { get; }
@@ -570,7 +579,9 @@ public sealed class MainViewModel : ViewModelBase
 
         LoadFolderCommand = new RelayCommand(ExecuteLoadFolder);
         LoadSampleStackCommand = new RelayCommand(ExecuteLoadSampleStack);
-        StartStackingCommand = new AsyncRelayCommand(ExecuteStartStackingAsync, () => !IsProcessing && Frames.Count >= 2);
+        StartStackingCommand = new AsyncRelayCommand(() => ExecuteStartStackingAsync(), () => !IsProcessing && Frames.Count >= 2);
+        StartPreviewStackCommand = new AsyncRelayCommand(() => ExecuteStartStackingAsync(ResolutionMode.FastPreview1280), () => !IsProcessing && Frames.Count >= 2);
+        StartFullMasterRenderCommand = new AsyncRelayCommand(() => ExecuteStartStackingAsync(ResolutionMode.FullMaster), () => !IsProcessing && Frames.Count >= 2);
         CancelStackingCommand = new RelayCommand(ExecuteCancelStacking, () => IsProcessing);
         ExportResultCommand = new RelayCommand(ExecuteExportResult, () => FusedBitmap != null && !IsProcessing);
         SelectAllFramesCommand = new RelayCommand(_ =>
@@ -877,8 +888,17 @@ public sealed class MainViewModel : ViewModelBase
         (StartStackingCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
     }
 
-    private async Task ExecuteStartStackingAsync()
+    private async Task ExecuteStartStackingAsync(ResolutionMode? overrideMode = null)
     {
+        if (overrideMode.HasValue)
+        {
+            SelectedRenderMode = overrideMode.Value;
+        }
+
+        ResolutionBadgeText = SelectedRenderMode == ResolutionMode.FastPreview1280
+            ? "⚡ FAST PREVIEW (1280px)"
+            : "💎 FULL MASTER (100% SENSOR)";
+
         var activeFiles = Frames.Where(f => f.IsSelected).Select(f => f.FilePath).ToList();
         if (activeFiles.Count < 2)
         {
@@ -904,7 +924,9 @@ public sealed class MainViewModel : ViewModelBase
             EnableLocalAlignment = EnableLocalAlignment,
             EnableEdgeReconstruction = EnableEdgeReconstruction,
             EnableTiledProcessing = EnableTiledProcessing,
-            TileSize = TileSize
+            TileSize = TileSize,
+            RenderMode = SelectedRenderMode,
+            PreviewMaxDimension = 1280
         };
 
         var progress = new Progress<StackProgress>(p =>

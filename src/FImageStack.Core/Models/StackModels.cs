@@ -97,6 +97,9 @@ public sealed class FusionSettings
     public bool EnableEdgeReconstruction { get; set; } = true;
     public bool EnableTiledProcessing { get; set; } = false;
     public int TileSize { get; set; } = 512;
+
+    public ResolutionMode RenderMode { get; set; } = ResolutionMode.FastPreview1280;
+    public int PreviewMaxDimension { get; set; } = 1280;
 }
 
 public sealed class StackValidationResult
