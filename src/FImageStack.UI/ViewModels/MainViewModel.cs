@@ -6,6 +6,7 @@ using System.Windows.Input;
 using System.Windows.Media.Imaging;
 using FImageStack.Application.Services;
 using FImageStack.Core;
+using FImageStack.Core.Acceleration;
 using FImageStack.Core.Models;
 using FImageStack.Core.PostProcessing;
 using FImageStack.Core.Presets;
