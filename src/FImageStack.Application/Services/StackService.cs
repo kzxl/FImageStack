@@ -137,7 +137,13 @@ public sealed class StackService : IStackService
             // 2. Alignment & Sub-Pixel Warp
             cancellationToken.ThrowIfCancellationRequested();
             sw.Restart();
-            _alignmentEngine.AlignStack(frames, settings.AlignmentMode, settings.EnableFocusBreathingCorrection, progress);
+            _alignmentEngine.AlignStack(
+                frames,
+                settings.AlignmentMode,
+                settings.EnableFocusBreathingCorrection,
+                settings.EnableLocalAlignment,
+                settings.LocalAlignmentGridSize,
+                progress);
             sw.Stop();
             benchmark.AlignmentTimeMs = sw.Elapsed.TotalMilliseconds;
 
