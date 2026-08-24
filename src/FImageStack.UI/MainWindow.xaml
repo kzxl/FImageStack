@@ -401,30 +401,73 @@
                             <Button Grid.Column="1" Content="💾 Export Image" Style="{StaticResource ModernButton}" Command="{Binding ExportResultCommand}" Margin="4,0,0,0" FontWeight="Bold" />
                         </Grid>
 
-                        <!-- 7. Quality & Performance Card -->
+                        <!-- 7. Advanced Quality Analyzer & Artifact Navigator Card -->
                         <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock Text="📊 QUALITY &amp; PERFORMANCE" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,10,0" />
+                                <Grid Margin="0,0,0,8">
+                                    <TextBlock Text="📊 QUALITY &amp; ARTIFACT ANALYZER" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding QualityScoreText}" Foreground="{StaticResource SuccessAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="13" />
+                                </Grid>
 
-                                <Grid Margin="0,0,0,6">
-                                    <TextBlock Text="Overall Quality Score:" Foreground="{StaticResource TextSecondary}" />
-                                    <TextBlock Text="{Binding QualityScoreText}" Foreground="{StaticResource SuccessAccent}" FontWeight="Bold" HorizontalAlignment="Right" />
+                                <!-- 6 Multi-Metric Bars -->
+                                <Grid Margin="0,0,0,4">
+                                    <TextBlock Text="Alignment Precision:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                    <TextBlock Text="{Binding MetricAlignmentScore, StringFormat='{}{0:F0}%'}" Foreground="{StaticResource SuccessAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
                                 </Grid>
-                                <Grid Margin="0,0,0,6">
-                                    <TextBlock Text="Focus Coverage:" Foreground="{StaticResource TextSecondary}" />
-                                    <TextBlock Text="{Binding FocusCoverageText}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding MetricAlignmentScore}" Height="5" Foreground="{StaticResource SuccessAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,6" />
+
+                                <Grid Margin="0,0,0,4">
+                                    <TextBlock Text="Focus Coverage:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                    <TextBlock Text="{Binding MetricFocusCoverageScore, StringFormat='{}{0:F0}%'}" Foreground="{StaticResource PrimaryAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
                                 </Grid>
-                                <Grid Margin="0,0,0,6">
-                                    <TextBlock Text="Artifacts &amp; Repairs:" Foreground="{StaticResource TextSecondary}" />
-                                    <TextBlock Text="{Binding ArtifactsReportText}" Foreground="{StaticResource WarningAccent}" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding MetricFocusCoverageScore}" Height="5" Foreground="{StaticResource PrimaryAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,6" />
+
+                                <Grid Margin="0,0,0,4">
+                                    <TextBlock Text="Ghosting Rate:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                    <TextBlock Text="{Binding MetricGhostingPercent, StringFormat='{}{0:F1}%'}" Foreground="{StaticResource DangerAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
                                 </Grid>
-                                <Grid Margin="0,0,0,6">
-                                    <TextBlock Text="Total Execution Time:" Foreground="{StaticResource TextSecondary}" />
-                                    <TextBlock Text="{Binding TimingText}" Foreground="{StaticResource PrimaryAccent}" FontWeight="Bold" HorizontalAlignment="Right" />
+                                <ProgressBar Minimum="0" Maximum="20" Value="{Binding MetricGhostingPercent}" Height="5" Foreground="{StaticResource DangerAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,6" />
+
+                                <Grid Margin="0,0,0,4">
+                                    <TextBlock Text="Halo Severity:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                    <TextBlock Text="{Binding MetricHaloPercent, StringFormat='{}{0:F1}%'}" Foreground="{StaticResource WarningAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
                                 </Grid>
-                                <Grid Margin="0,0,0,0">
-                                    <TextBlock Text="Peak Memory Working Set:" Foreground="{StaticResource TextSecondary}" />
-                                    <TextBlock Text="{Binding MemoryUsageText}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                <ProgressBar Minimum="0" Maximum="20" Value="{Binding MetricHaloPercent}" Height="5" Foreground="{StaticResource WarningAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,6" />
+
+                                <Grid Margin="0,0,0,4">
+                                    <TextBlock Text="Edge Quality &amp; Continuity:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                    <TextBlock Text="{Binding MetricEdgeQualityScore, StringFormat='{}{0:F0}%'}" Foreground="{StaticResource SuccessAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
+                                </Grid>
+                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding MetricEdgeQualityScore}" Height="5" Foreground="{StaticResource SuccessAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,8" />
+
+                                <!-- Interactive Detected Artifacts Navigator -->
+                                <Border Background="#121524" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,4,0,0">
+                                    <StackPanel>
+                                        <TextBlock Text="🚨 DETECTED ARTIFACT REGIONS" FontWeight="Bold" FontSize="11" Foreground="{StaticResource WarningAccent}" Margin="0,0,0,6" />
+                                        <ItemsControl ItemsSource="{Binding DetectedArtifactRegions}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,2">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="Auto" />
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <Border Grid.Column="0" Background="{Binding BadgeColorHex}" CornerRadius="3" Padding="4,1" Margin="0,0,6,0" VerticalAlignment="Center">
+                                                            <TextBlock Text="{Binding TypeName}" FontWeight="Bold" FontSize="9" Foreground="#FFFFFF" />
+                                                        </Border>
+                                                        <TextBlock Grid.Column="1" Text="{Binding Description}" Foreground="{StaticResource TextSecondary}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                                        <Button Grid.Column="2" Content="🎯 JUMP" Style="{StaticResource ModernButton}" Command="{Binding DataContext.JumpToArtifactRegionCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Padding="6,2" FontSize="10" Margin="4,0,0,0" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                </Border>
+
+                                <Grid Margin="0,8,0,0">
+                                    <TextBlock Text="{Binding TimingText, StringFormat='Speed: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" />
+                                    <TextBlock Text="{Binding MemoryUsageText, StringFormat='RAM: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" HorizontalAlignment="Right" />
                                 </Grid>
                             </StackPanel>
                         </Border>

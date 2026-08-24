@@ -198,19 +198,7 @@ public sealed class StackService : IStackService
             sw.Stop();
             benchmark.DepthMapTimeMs = sw.Elapsed.TotalMilliseconds;
 
-            // 6. Quality & Focus Gap Analysis (Phase 10 & 11)
-            if (settings.EnableQualityAnalysis)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                sw.Restart();
-                progress?.Report(new StackProgress("Quality Analysis", 0, "Analyzing stack coverage and gaps..."));
-                result.QualityReport = _qualityAnalyzer.AnalyzeQuality(frames, result.DepthResult);
-                progress?.Report(new StackProgress("Quality Analysis", 100, $"Quality evaluated: {result.QualityReport.OverallScore:F0}% ({result.QualityReport.FocusCoverageRating})"));
-                sw.Stop();
-                benchmark.QualityAnalysisTimeMs = sw.Elapsed.TotalMilliseconds;
-            }
-
-            // 7. Fusion Stage
+            // 6. Fusion Stage
             cancellationToken.ThrowIfCancellationRequested();
             sw.Restart();
 
@@ -279,6 +267,18 @@ public sealed class StackService : IStackService
                 }
                 progress?.Report(new StackProgress("Edge Reconstruction", 100, $"Reconstructed {edgeRes.ReconstructedEdgeCount} edge pixels"));
                 sw.Stop();
+            }
+
+            // 11. Comprehensive Quality & Multi-Metric Analysis
+            if (settings.EnableQualityAnalysis)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                sw.Restart();
+                progress?.Report(new StackProgress("Quality Analysis", 0, "Evaluating multi-metric stack quality..."));
+                result.QualityReport = _qualityAnalyzer.AnalyzeQuality(frames, result.DepthResult, result.ArtifactMap, result.MotionResult);
+                progress?.Report(new StackProgress("Quality Analysis", 100, $"Quality: {result.QualityReport.OverallScore:F1}% ({result.QualityReport.FocusCoverageRating})"));
+                sw.Stop();
+                benchmark.QualityAnalysisTimeMs = sw.Elapsed.TotalMilliseconds;
             }
 
             totalStopwatch.Stop();

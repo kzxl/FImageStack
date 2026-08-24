@@ -41,6 +41,23 @@ public sealed class PixelInspectorInfo : ViewModelBase
     public string StatusBadge { get => _statusBadge; set => SetProperty(ref _statusBadge, value); }
 }
 
+public sealed class ArtifactRegionViewModel : ViewModelBase
+{
+    public int Id { get; init; }
+    public string TypeName { get; init; } = string.Empty;
+    public int CenterX { get; init; }
+    public int CenterY { get; init; }
+    public float Severity { get; init; }
+    public string Description { get; init; } = string.Empty;
+    public string BadgeColorHex => TypeName switch
+    {
+        "HALO" => "#F59E0B",
+        "GHOST" => "#EF4444",
+        "SEAM" => "#38BDF8",
+        _ => "#A855F7"
+    };
+}
+
 public sealed class MainViewModel : ViewModelBase
 {
     private readonly IStackService _stackService;
@@ -115,6 +132,23 @@ public sealed class MainViewModel : ViewModelBase
     private BitmapSource? _histogramBitmap;
     private string _shadowClippingText = "0.0%";
     private string _highlightClippingText = "0.0%";
+
+    // Advanced 6-Metric Quality Analyzer
+    private double _metricAlignmentScore = 98.0;
+    private double _metricFocusCoverageScore = 95.0;
+    private double _metricGhostingPercent = 2.0;
+    private double _metricHaloPercent = 3.0;
+    private double _metricNoisePercent = 2.5;
+    private double _metricEdgeQualityScore = 96.0;
+
+    public double MetricAlignmentScore { get => _metricAlignmentScore; set => SetProperty(ref _metricAlignmentScore, value); }
+    public double MetricFocusCoverageScore { get => _metricFocusCoverageScore; set => SetProperty(ref _metricFocusCoverageScore, value); }
+    public double MetricGhostingPercent { get => _metricGhostingPercent; set => SetProperty(ref _metricGhostingPercent, value); }
+    public double MetricHaloPercent { get => _metricHaloPercent; set => SetProperty(ref _metricHaloPercent, value); }
+    public double MetricNoisePercent { get => _metricNoisePercent; set => SetProperty(ref _metricNoisePercent, value); }
+    public double MetricEdgeQualityScore { get => _metricEdgeQualityScore; set => SetProperty(ref _metricEdgeQualityScore, value); }
+
+    public ObservableCollection<ArtifactRegionViewModel> DetectedArtifactRegions { get; } = new();
 
     public ObservableCollection<FrameItemViewModel> Frames { get; } = new();
 
@@ -515,6 +549,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand AnalyzeFramesCommand { get; }
     public ICommand ResetPostProcessingCommand { get; }
     public ICommand JumpToInspectedFrameCommand { get; }
+    public ICommand JumpToArtifactRegionCommand { get; }
     public ICommand UndoRetouchCommand { get; }
     public ICommand RedoRetouchCommand { get; }
     public ICommand ClearRetouchCommand { get; }
@@ -575,6 +610,16 @@ public sealed class MainViewModel : ViewModelBase
             {
                 SelectedFrame = Frames[InspectorInfo.SourceFrameIndex];
                 SelectedViewTab = 7; // Switch to Source Frame tab
+            }
+        });
+
+        JumpToArtifactRegionCommand = new RelayCommand(param =>
+        {
+            if (param is ArtifactRegionViewModel r)
+            {
+                InspectPixel(r.CenterX, r.CenterY);
+                SelectedViewTab = 0; // Fused view with HUD
+                StatusMessage = $"Navigated to {r.TypeName} at ({r.CenterX}, {r.CenterY}) [Severity: {r.Severity * 100:F0}%]. Retouch Brush is ready.";
             }
         });
 
@@ -900,8 +945,29 @@ public sealed class MainViewModel : ViewModelBase
 
             if (result.QualityReport != null)
             {
-                QualityScoreText = $"{result.QualityReport.OverallScore:F0}% ({result.QualityReport.FocusCoverageRating})";
+                QualityScoreText = $"{result.QualityReport.OverallScore:F1}% ({result.QualityReport.FocusCoverageRating})";
                 FocusCoverageText = $"{result.QualityReport.FocusCoveragePercentage:F1}% (Gaps: {result.QualityReport.DetectedGaps.Count})";
+
+                MetricAlignmentScore = result.QualityReport.AlignmentScore;
+                MetricFocusCoverageScore = result.QualityReport.FocusCoverageScore;
+                MetricGhostingPercent = result.QualityReport.GhostingPercent;
+                MetricHaloPercent = result.QualityReport.HaloPercent;
+                MetricNoisePercent = result.QualityReport.NoisePercent;
+                MetricEdgeQualityScore = result.QualityReport.EdgeQualityScore;
+
+                DetectedArtifactRegions.Clear();
+                foreach (var a in result.QualityReport.TopArtifacts)
+                {
+                    DetectedArtifactRegions.Add(new ArtifactRegionViewModel
+                    {
+                        Id = a.Id,
+                        TypeName = a.TypeName,
+                        CenterX = a.CenterX,
+                        CenterY = a.CenterY,
+                        Severity = a.Severity,
+                        Description = a.Description
+                    });
+                }
             }
 
             if (result.ArtifactMap != null)
