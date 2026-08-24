@@ -35,6 +35,7 @@ public sealed class StackService : IStackService
     private readonly IAutoRepairEngine _autoRepairEngine;
     private readonly IEdgeFusionEngine _edgeFusionEngine;
     private readonly ITiledProcessor _tiledProcessor;
+    private readonly ITemporalDenoiseEngine _temporalDenoiseEngine;
 
     public StackService(
         IImageIO imageIO,
@@ -45,7 +46,8 @@ public sealed class StackService : IStackService
         IArtifactDetector? artifactDetector = null,
         IAutoRepairEngine? autoRepairEngine = null,
         IEdgeFusionEngine? edgeFusionEngine = null,
-        ITiledProcessor? tiledProcessor = null)
+        ITiledProcessor? tiledProcessor = null,
+        ITemporalDenoiseEngine? temporalDenoiseEngine = null)
     {
         _imageIO = imageIO;
         _alignmentEngine = alignmentEngine ?? new AdvancedAlignmentEngine();
@@ -56,6 +58,7 @@ public sealed class StackService : IStackService
         _autoRepairEngine = autoRepairEngine ?? new StandardAutoRepairEngine();
         _edgeFusionEngine = edgeFusionEngine ?? new EdgeFusionEngine();
         _tiledProcessor = tiledProcessor ?? new StandardTiledProcessor();
+        _temporalDenoiseEngine = temporalDenoiseEngine ?? new TemporalDenoiseEngine();
     }
 
     public async Task<ProcessedStackResult> ProcessStackAsync(
@@ -121,6 +124,16 @@ public sealed class StackService : IStackService
                 progress?.Report(new StackProgress("Motion Detection", 100, $"Motion analyzed ({result.MotionResult.OverallMotionPercentage:F1}% dynamic)"));
                 sw.Stop();
                 benchmark.MotionTimeMs = sw.Elapsed.TotalMilliseconds;
+            }
+
+            // 3.5 Temporal Noise Reduction (Multi-Frame SNR Boost)
+            if (settings.EnableTemporalDenoising)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                sw.Restart();
+                progress?.Report(new StackProgress("Temporal Denoise", 0, "Applying motion-adaptive multi-frame denoising..."));
+                _temporalDenoiseEngine.DenoiseStack(frames, result.MotionResult, settings.DenoiseStrength, progress);
+                sw.Stop();
             }
 
             // 4. Focus Measure Calculation

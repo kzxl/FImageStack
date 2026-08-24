@@ -136,6 +136,8 @@ public sealed class FusionSettings
     public bool EnableTiledProcessing { get; set; } = false;
     public int TileSize { get; set; } = 512;
     public Alignment.LensDistortionParams LensDistortion { get; set; } = default;
+    public bool EnableTemporalDenoising { get; set; } = true;
+    public float DenoiseStrength { get; set; } = 1.0f;
 
     public ResolutionMode RenderMode { get; set; } = ResolutionMode.FastPreview1280;
     public int PreviewMaxDimension { get; set; } = 1280;
