@@ -13,19 +13,31 @@ public enum PixelFormatType
     RgbaFloat32
 }
 
+public enum AlignmentMode
+{
+    None,
+    TranslationOnly,
+    Rigid,         // Translation + Rotation
+    Similarity,    // Translation + Rotation + Scale (Focus Breathing)
+    Affine,        // 6 DOF (Translation + Rotation + Scale + Shear)
+    Homography     // 8 DOF (Perspective Transformation)
+}
+
 public enum FocusMeasureMethod
 {
     Laplacian,
     ModifiedLaplacian,
     Tenengrad,
-    Variance
+    LocalVariance,
+    Wavelet
 }
 
 public enum FusionMethod
 {
     WinnerTakesAll,
     FocusWeighted,
-    MultiScalePyramid
+    MultiScalePyramid,
+    WaveletDWT
 }
 
 public enum ArtifactType

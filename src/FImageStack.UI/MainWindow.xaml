@@ -203,6 +203,7 @@
                                 <TextBlock Text="Fusion Algorithm:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,4" />
                                 <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedMethod}" Margin="0,0,0,10">
                                     <ComboBoxItem Content="Multi-Scale Laplacian Pyramid" Tag="{x:Static core:FusionMethod.MultiScalePyramid}" IsSelected="True" />
+                                    <ComboBoxItem Content="2D Wavelet DWT Fusion" Tag="{x:Static core:FusionMethod.WaveletDWT}" />
                                     <ComboBoxItem Content="Focus-Weighted Continuous Blend" Tag="{x:Static core:FusionMethod.FocusWeighted}" />
                                     <ComboBoxItem Content="Winner-Takes-All (WTA Fast)" Tag="{x:Static core:FusionMethod.WinnerTakesAll}" />
                                 </ComboBox>
@@ -211,6 +212,17 @@
                                 <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedFocusMethod}" Margin="0,0,0,10">
                                     <ComboBoxItem Content="Modified Laplacian (SML Edge)" Tag="{x:Static core:FocusMeasureMethod.ModifiedLaplacian}" IsSelected="True" />
                                     <ComboBoxItem Content="Tenengrad (Sobel Gradient)" Tag="{x:Static core:FocusMeasureMethod.Tenengrad}" />
+                                    <ComboBoxItem Content="Local Variance (Texture)" Tag="{x:Static core:FocusMeasureMethod.LocalVariance}" />
+                                    <ComboBoxItem Content="2D Wavelet Sharpness" Tag="{x:Static core:FocusMeasureMethod.Wavelet}" />
+                                </ComboBox>
+
+                                <TextBlock Text="Auto Alignment Mode:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,4" />
+                                <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedAlignmentMode}" Margin="0,0,0,10">
+                                    <ComboBoxItem Content="Similarity (Scale + Rot + Trans)" Tag="{x:Static core:AlignmentMode.Similarity}" IsSelected="True" />
+                                    <ComboBoxItem Content="Affine (6-DOF Full Scale/Shear)" Tag="{x:Static core:AlignmentMode.Affine}" />
+                                    <ComboBoxItem Content="Homography (8-DOF Perspective)" Tag="{x:Static core:AlignmentMode.Homography}" />
+                                    <ComboBoxItem Content="Translation Only (Sub-Pixel X/Y)" Tag="{x:Static core:AlignmentMode.TranslationOnly}" />
+                                    <ComboBoxItem Content="None (Locked Tripod)" Tag="{x:Static core:AlignmentMode.None}" />
                                 </ComboBox>
 
                                 <Grid Margin="0,0,0,4">

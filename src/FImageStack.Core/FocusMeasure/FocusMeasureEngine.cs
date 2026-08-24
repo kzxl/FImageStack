@@ -1,6 +1,4 @@
 using System.Runtime.CompilerServices;
-using System.Runtime.Intrinsics;
-using System.Runtime.Intrinsics.X86;
 using FImageStack.Core.Models;
 
 namespace FImageStack.Core.FocusMeasure;
@@ -20,7 +18,6 @@ public sealed class ModifiedLaplacianFocusMeasure : IFocusMeasureEngine
         int width = grayImage.Width;
         int height = grayImage.Height;
 
-        // Temporary buffer for raw modified laplacian
         using var rawLaplacian = new ImageBuffer<float>(width, height);
         float* src = grayImage.DataPointer;
         float* lap = rawLaplacian.DataPointer;
@@ -124,6 +121,119 @@ public sealed class TenengradFocusMeasure : IFocusMeasureEngine
                     for (int wx = xMin; wx <= xMax; wx++)
                     {
                         sum += grad[wOffset + wx];
+                    }
+                }
+                dst[y * width + x] = sum;
+            }
+        });
+    }
+}
+
+public sealed class LocalVarianceFocusMeasure : IFocusMeasureEngine
+{
+    public FocusMeasureMethod Method => FocusMeasureMethod.LocalVariance;
+
+    public unsafe void ComputeFocusMap(ImageBuffer<float> grayImage, ImageBuffer<float> outputFocusMap, int windowRadius = 2)
+    {
+        int width = grayImage.Width;
+        int height = grayImage.Height;
+        float* src = grayImage.DataPointer;
+        float* dst = outputFocusMap.DataPointer;
+        int radius = Math.Max(1, windowRadius);
+
+        Parallel.For(0, height, y =>
+        {
+            int yMin = Math.Max(0, y - radius);
+            int yMax = Math.Min(height - 1, y + radius);
+
+            for (int x = 0; x < width; x++)
+            {
+                int xMin = Math.Max(0, x - radius);
+                int xMax = Math.Min(width - 1, x + radius);
+
+                float sum = 0f;
+                float sumSq = 0f;
+                int count = 0;
+
+                for (int wy = yMin; wy <= yMax; wy++)
+                {
+                    int wOffset = wy * width;
+                    for (int wx = xMin; wx <= xMax; wx++)
+                    {
+                        float val = src[wOffset + wx];
+                        sum += val;
+                        sumSq += val * val;
+                        count++;
+                    }
+                }
+
+                float mean = sum / count;
+                float variance = Math.Max(0f, (sumSq / count) - (mean * mean));
+                dst[y * width + x] = variance * 10f; // scaled for normalization
+            }
+        });
+    }
+}
+
+public sealed class WaveletSharpnessMeasure : IFocusMeasureEngine
+{
+    public FocusMeasureMethod Method => FocusMeasureMethod.Wavelet;
+
+    public unsafe void ComputeFocusMap(ImageBuffer<float> grayImage, ImageBuffer<float> outputFocusMap, int windowRadius = 2)
+    {
+        int width = grayImage.Width;
+        int height = grayImage.Height;
+
+        using var highFreqBuffer = new ImageBuffer<float>(width, height);
+        float* src = grayImage.DataPointer;
+        float* hf = highFreqBuffer.DataPointer;
+
+        // 2D Haar Wavelet Decomposition Detail Energy: LH, HL, HH
+        Parallel.For(0, height - 1, y =>
+        {
+            int rowOffset = y * width;
+            int nextRow = (y + 1) * width;
+
+            for (int x = 0; x < width - 1; x++)
+            {
+                float a = src[rowOffset + x];
+                float b = src[rowOffset + x + 1];
+                float c = src[nextRow + x];
+                float d = src[nextRow + x + 1];
+
+                // Haar 2x2 transforms:
+                // LH = (a + b) - (c + d) (Horizontal edge)
+                // HL = (a - b) + (c - d) (Vertical edge)
+                // HH = (a - b) - (c - d) (Diagonal corner)
+                float lh = 0.5f * ((a + b) - (c + d));
+                float hl = 0.5f * ((a - b) + (c - d));
+                float hh = 0.5f * ((a - b) - (c - d));
+
+                hf[rowOffset + x] = MathF.Sqrt(lh * lh + hl * hl + hh * hh);
+            }
+        });
+
+        // Window smoothing
+        float* dst = outputFocusMap.DataPointer;
+        int radius = Math.Max(1, windowRadius);
+
+        Parallel.For(0, height, y =>
+        {
+            int yMin = Math.Max(0, y - radius);
+            int yMax = Math.Min(height - 1, y + radius);
+
+            for (int x = 0; x < width; x++)
+            {
+                int xMin = Math.Max(0, x - radius);
+                int xMax = Math.Min(width - 1, x + radius);
+
+                float sum = 0f;
+                for (int wy = yMin; wy <= yMax; wy++)
+                {
+                    int wOffset = wy * width;
+                    for (int wx = xMin; wx <= xMax; wx++)
+                    {
+                        sum += hf[wOffset + wx];
                     }
                 }
                 dst[y * width + x] = sum;

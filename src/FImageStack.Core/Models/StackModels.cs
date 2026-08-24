@@ -80,6 +80,7 @@ public sealed class FusionSettings
 {
     public FusionMethod Method { get; set; } = FusionMethod.MultiScalePyramid;
     public FocusMeasureMethod FocusMethod { get; set; } = FocusMeasureMethod.ModifiedLaplacian;
+    public AlignmentMode AlignmentMode { get; set; } = AlignmentMode.Similarity;
     public int PyramidLevels { get; set; } = 5;
     public int SmoothingRadius { get; set; } = 2;
     public float ContrastThreshold { get; set; } = 0.001f;

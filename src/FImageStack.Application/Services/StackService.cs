@@ -87,7 +87,7 @@ public sealed class StackService : IStackService
         ITiledProcessor? tiledProcessor = null)
     {
         _imageIO = imageIO;
-        _alignmentEngine = alignmentEngine ?? new FocusBreathingCompensator();
+        _alignmentEngine = alignmentEngine ?? new AdvancedAlignmentEngine();
         _depthMapEstimator = depthMapEstimator ?? new StandardDepthMapEstimator();
         _motionDetector = motionDetector ?? new FrameDifferenceMotionDetector();
         _qualityAnalyzer = qualityAnalyzer ?? new StandardStackQualityAnalyzer();
@@ -134,10 +134,10 @@ public sealed class StackService : IStackService
 
         try
         {
-            // 2. Alignment & Breathing Correction
+            // 2. Alignment & Sub-Pixel Warp
             cancellationToken.ThrowIfCancellationRequested();
             sw.Restart();
-            _alignmentEngine.AlignStack(frames, settings.EnableFocusBreathingCorrection, progress);
+            _alignmentEngine.AlignStack(frames, settings.AlignmentMode, settings.EnableFocusBreathingCorrection, progress);
             sw.Stop();
             benchmark.AlignmentTimeMs = sw.Elapsed.TotalMilliseconds;
 
@@ -161,6 +161,8 @@ public sealed class StackService : IStackService
             IFocusMeasureEngine focusEngine = settings.FocusMethod switch
             {
                 FocusMeasureMethod.Tenengrad => new TenengradFocusMeasure(),
+                FocusMeasureMethod.LocalVariance => new LocalVarianceFocusMeasure(),
+                FocusMeasureMethod.Wavelet => new WaveletSharpnessMeasure(),
                 _ => new ModifiedLaplacianFocusMeasure()
             };
 
@@ -199,7 +201,7 @@ public sealed class StackService : IStackService
                 benchmark.QualityAnalysisTimeMs = sw.Elapsed.TotalMilliseconds;
             }
 
-            // 7. Fusion Stage (Phase 6 or Phase 12 Tiled)
+            // 7. Fusion Stage
             cancellationToken.ThrowIfCancellationRequested();
             sw.Restart();
 
@@ -207,6 +209,7 @@ public sealed class StackService : IStackService
             {
                 FusionMethod.WinnerTakesAll => new WinnerTakesAllFusionEngine(),
                 FusionMethod.FocusWeighted => new FocusWeightedFusionEngine(),
+                FusionMethod.WaveletDWT => new WaveletFusionEngine(),
                 _ => new MultiScalePyramidFusionEngine()
             };
 

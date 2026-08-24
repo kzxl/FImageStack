@@ -45,6 +45,7 @@ public sealed class MainViewModel : ViewModelBase
     // Fusion Settings
     private FusionMethod _selectedMethod = FusionMethod.MultiScalePyramid;
     private FocusMeasureMethod _selectedFocusMethod = FocusMeasureMethod.ModifiedLaplacian;
+    private AlignmentMode _selectedAlignmentMode = AlignmentMode.Similarity;
     private int _pyramidLevels = 5;
     private int _smoothingRadius = 2;
     private bool _enableQualityAnalysis = true;
@@ -55,7 +56,6 @@ public sealed class MainViewModel : ViewModelBase
     private int _tileSize = 512;
 
     // Split Comparison
-    private bool _isSplitComparisonActive;
     private double _splitRatio = 0.5;
 
     // Post-Processing Settings
@@ -272,6 +272,12 @@ public sealed class MainViewModel : ViewModelBase
     {
         get => _selectedFocusMethod;
         set => SetProperty(ref _selectedFocusMethod, value);
+    }
+
+    public AlignmentMode SelectedAlignmentMode
+    {
+        get => _selectedAlignmentMode;
+        set => SetProperty(ref _selectedAlignmentMode, value);
     }
 
     public int PyramidLevels
@@ -506,6 +512,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             Method = SelectedMethod,
             FocusMethod = SelectedFocusMethod,
+            AlignmentMode = SelectedAlignmentMode,
             PyramidLevels = PyramidLevels,
             SmoothingRadius = SmoothingRadius,
             EnableDepthSmoothing = true,
