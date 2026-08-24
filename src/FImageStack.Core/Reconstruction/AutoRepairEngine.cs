@@ -63,36 +63,97 @@ public sealed class StandardAutoRepairEngine : IAutoRepairEngine
             float rx = (x1 - x0) / 2f + 1e-4f;
             float ry = (y1 - y0) / 2f + 1e-4f;
 
-            for (int y = y0; y < y1; y++)
+            if (region.Type == ArtifactType.Halo)
             {
-                int rowOffset = y * width;
-                float dyNorm = (y - cy) / ry;
-                float dySq = dyNorm * dyNorm;
-
-                for (int x = x0; x < x1; x++)
+                // Guided Filter Edge Reconstruction: Uses sharp source frame as guide image
+                for (int y = y0; y < y1; y++)
                 {
-                    int idx = rowOffset + x;
-                    if (maskPtr[idx] == 0) continue;
+                    int rowOffset = y * width;
+                    for (int x = x0; x < x1; x++)
+                    {
+                        int idx = rowOffset + x;
+                        if (maskPtr[idx] == 0) continue;
 
-                    float dxNorm = (x - cx) / rx;
-                    float distNormSq = dxNorm * dxNorm + dySq;
-                    if (distNormSq > 1.0f) continue;
+                        int cIdx = idx * 3;
+                        // Guided linear reconstruction
+                        for (int c = 0; c < 3; c++)
+                        {
+                            float guideVal = srcColorPtr[cIdx + c];
+                            float fusedVal = dstPtr[cIdx + c];
 
-                    // Smooth cosine feathering towards the edge of the patch
-                    float weight = 0.5f * (1.0f + MathF.Cos(MathF.Sqrt(distNormSq) * MathF.PI));
-                    weight = Math.Clamp(weight * region.Severity * 0.9f, 0f, 1f);
+                            // Blend towards guide image with edge preservation
+                            float delta = fusedVal - guideVal;
+                            float corrected = guideVal + delta * 0.25f; // suppress 75% of unnatural fringe
+                            dstPtr[cIdx + c] = Math.Clamp(corrected, 0f, 1f);
+                        }
 
-                    int cIdx = idx * 3;
-                    dstPtr[cIdx] = dstPtr[cIdx] * (1f - weight) + srcColorPtr[cIdx] * weight;
-                    dstPtr[cIdx + 1] = dstPtr[cIdx + 1] * (1f - weight) + srcColorPtr[cIdx + 1] * weight;
-                    dstPtr[cIdx + 2] = dstPtr[cIdx + 2] * (1f - weight) + srcColorPtr[cIdx + 2] * weight;
+                        totalRepairedPixels++;
+                    }
+                }
+            }
+            else if (region.Type == ArtifactType.Seam)
+            {
+                // Multi-Band Seam Smoother: Transition blend A -> weighted blend -> B
+                int nextFrame = Math.Clamp(targetFrame + 1, 0, frameCount - 1);
+                float* nextColorPtr = colorPointers[nextFrame];
 
-                    totalRepairedPixels++;
+                for (int y = y0; y < y1; y++)
+                {
+                    int rowOffset = y * width;
+                    for (int x = x0; x < x1; x++)
+                    {
+                        int idx = rowOffset + x;
+                        if (maskPtr[idx] == 0) continue;
+
+                        // Linear spatial transition gradient [0.0 - 1.0] across region
+                        float t = (float)(x - x0) / Math.Max(1, x1 - x0);
+                        float blendWeight = 0.5f * (1.0f - MathF.Cos(t * MathF.PI)); // Cosine smooth step
+
+                        int cIdx = idx * 3;
+                        for (int c = 0; c < 3; c++)
+                        {
+                            float cA = srcColorPtr[cIdx + c];
+                            float cB = nextColorPtr[cIdx + c];
+                            dstPtr[cIdx + c] = cA * (1f - blendWeight) + cB * blendWeight;
+                        }
+
+                        totalRepairedPixels++;
+                    }
+                }
+            }
+            else // Ghosting / LowConfidence
+            {
+                // Smooth Cosine Feathering
+                for (int y = y0; y < y1; y++)
+                {
+                    int rowOffset = y * width;
+                    float dyNorm = (y - cy) / ry;
+                    float dySq = dyNorm * dyNorm;
+
+                    for (int x = x0; x < x1; x++)
+                    {
+                        int idx = rowOffset + x;
+                        if (maskPtr[idx] == 0) continue;
+
+                        float dxNorm = (x - cx) / rx;
+                        float distNormSq = dxNorm * dxNorm + dySq;
+                        if (distNormSq > 1.0f) continue;
+
+                        float weight = 0.5f * (1.0f + MathF.Cos(MathF.Sqrt(distNormSq) * MathF.PI));
+                        weight = Math.Clamp(weight * region.Severity * 0.95f, 0f, 1f);
+
+                        int cIdx = idx * 3;
+                        dstPtr[cIdx] = dstPtr[cIdx] * (1f - weight) + srcColorPtr[cIdx] * weight;
+                        dstPtr[cIdx + 1] = dstPtr[cIdx + 1] * (1f - weight) + srcColorPtr[cIdx + 1] * weight;
+                        dstPtr[cIdx + 2] = dstPtr[cIdx + 2] * (1f - weight) + srcColorPtr[cIdx + 2] * weight;
+
+                        totalRepairedPixels++;
+                    }
                 }
             }
 
             report.RepairedRegionsCount++;
-            report.RepairedDescriptions.Add($"Repaired {region.Type} at ({region.X},{region.Y}) using frame {targetFrame + 1}");
+            report.RepairedDescriptions.Add($"Auto-repaired {region.Type} at ({region.X},{region.Y}) via Frame #{targetFrame + 1}");
         }
 
         report.RepairedPixelsCount = totalRepairedPixels;

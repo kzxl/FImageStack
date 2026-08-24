@@ -1,4 +1,5 @@
 using FImageStack.Core;
+using FImageStack.Core.DepthMap;
 using FImageStack.Core.Models;
 
 namespace FImageStack.Core.Artifact;
@@ -69,12 +70,61 @@ public sealed class StandardArtifactDetector : IArtifactDetector
         float* confMap = depthResult.ConfidenceMap.DataPointer;
 
         float*[] colorPointers = new float*[frameCount];
+        float*[] grayPointers = new float*[frameCount];
         for (int f = 0; f < frameCount; f++)
         {
             colorPointers[f] = frames[f].ColorBuffer!.DataPointer;
+            grayPointers[f] = frames[f].GrayBuffer != null ? frames[f].GrayBuffer!.DataPointer : frames[f].ColorBuffer!.DataPointer;
         }
 
-        // Scan image in blocks of 32x32 to cluster artifacts
+        // 1. Edge Detection & Halo Gradient Analysis (White/Dark Fringes along edges)
+        using var edgeBuffer = new ImageBuffer<float>(width, height);
+        float* edgePtr = edgeBuffer.DataPointer;
+
+        Parallel.For(1, height - 1, y =>
+        {
+            int rowOffset = y * width;
+            int prevRow = (y - 1) * width;
+            int nextRow = (y + 1) * width;
+
+            for (int x = 1; x < width - 1; x++)
+            {
+                int frameIdx = Math.Clamp(srcMap[rowOffset + x], 0, frameCount - 1);
+                float* srcG = grayPointers[frameIdx];
+
+                // Sobel on source frame
+                float gx = (srcG[nextRow + x + 1] + 2f * srcG[rowOffset + x + 1] + srcG[prevRow + x + 1])
+                         - (srcG[nextRow + x - 1] + 2f * srcG[rowOffset + x - 1] + srcG[prevRow + x - 1]);
+                float gy = (srcG[nextRow + x - 1] + 2f * srcG[nextRow + x] + srcG[nextRow + x + 1])
+                         - (srcG[prevRow + x - 1] + 2f * srcG[prevRow + x] + srcG[prevRow + x + 1]);
+
+                edgePtr[rowOffset + x] = MathF.Sqrt(gx * gx + gy * gy);
+            }
+        });
+
+        // 2. Seam Line Analysis (Transitions between non-consecutive frames)
+        using var seamBuffer = new ImageBuffer<byte>(width, height);
+        byte* seamPtr = seamBuffer.DataPointer;
+
+        Parallel.For(0, height - 1, y =>
+        {
+            int rowOffset = y * width;
+            int nextRow = (y + 1) * width;
+
+            for (int x = 0; x < width - 1; x++)
+            {
+                int fCurrent = srcMap[rowOffset + x];
+                int fRight = srcMap[rowOffset + x + 1];
+                int fDown = srcMap[nextRow + x];
+
+                if (Math.Abs(fCurrent - fRight) >= 2 || Math.Abs(fCurrent - fDown) >= 2)
+                {
+                    seamPtr[rowOffset + x] = 255;
+                }
+            }
+        });
+
+        // 3. Block-Level Clustering for Artifact Regions (32x32 blocks)
         int blockSize = 32;
         int blocksX = (width + blockSize - 1) / blockSize;
         int blocksY = (height + blockSize - 1) / blockSize;
@@ -92,9 +142,9 @@ public sealed class StandardArtifactDetector : IArtifactDetector
 
                 int haloPixels = 0;
                 int ghostPixels = 0;
-                int lowConfPixels = 0;
-                float maxDeviation = 0f;
+                int seamPixels = 0;
                 int dominantFrame = 0;
+                int blockTotal = (y1 - y0) * (x1 - x0);
 
                 for (int y = y0; y < y1; y++)
                 {
@@ -106,10 +156,7 @@ public sealed class StandardArtifactDetector : IArtifactDetector
                         dominantFrame = frameIdx;
 
                         float conf = confMap[idx];
-                        if (conf < 0.15f)
-                        {
-                            lowConfPixels++;
-                        }
+                        float edgeMag = edgePtr[idx];
 
                         // Compare fused color against source frame color
                         int cIdx = idx * 3;
@@ -119,27 +166,29 @@ public sealed class StandardArtifactDetector : IArtifactDetector
                         float db = MathF.Abs(fusedPtr[cIdx + 2] - srcColor[2]);
                         float colorDiff = (dr + dg + db) / 3f;
 
-                        if (colorDiff > maxDeviation) maxDeviation = colorDiff;
-
-                        // Thresholds modulated by sensitivity
-                        float haloThreshold = 0.25f - (sensitivity - 0.5f) * 0.15f;
-                        float ghostThreshold = 0.35f - (sensitivity - 0.5f) * 0.20f;
-
-                        if (colorDiff > ghostThreshold && conf < 0.6f)
+                        // Check Seam Lines
+                        if (seamPtr[idx] > 0)
                         {
-                            ghostPixels++;
-                            maskPtr[idx] = 255;
+                            seamPixels++;
+                            maskPtr[idx] = 120; // Seam mask value
                         }
-                        else if (colorDiff > haloThreshold)
+
+                        // Check White/Dark Halo Fringes along edges (Overshoot / Undershoot)
+                        if (edgeMag > 0.15f && colorDiff > 0.20f)
                         {
                             haloPixels++;
-                            maskPtr[idx] = 180;
+                            maskPtr[idx] = 180; // Halo mask value
+                        }
+                        // Check Ghosting (Color divergence in low/mid confidence dynamic zones)
+                        else if (colorDiff > 0.30f && conf < 0.65f)
+                        {
+                            ghostPixels++;
+                            maskPtr[idx] = 255; // Ghost mask value
                         }
                     }
                 }
 
-                int blockPixels = (y1 - y0) * (x1 - x0);
-                if (ghostPixels > blockPixels * 0.20f)
+                if (ghostPixels > blockTotal * 0.15f)
                 {
                     artifactMap.Regions.Add(new ArtifactRegion
                     {
@@ -149,12 +198,12 @@ public sealed class StandardArtifactDetector : IArtifactDetector
                         Y = y0,
                         Width = x1 - x0,
                         Height = y1 - y0,
-                        Severity = Math.Clamp((float)ghostPixels / blockPixels, 0f, 1f),
+                        Severity = Math.Clamp((float)ghostPixels / blockTotal, 0f, 1f),
                         SuggestedSourceFrame = dominantFrame,
-                        Description = $"Ghosting artifact detected in {x0},{y0}"
+                        Description = $"Motion Ghosting ({ghostPixels}px, Frame #{dominantFrame + 1})"
                     });
                 }
-                else if (haloPixels > blockPixels * 0.25f)
+                else if (haloPixels > blockTotal * 0.15f)
                 {
                     artifactMap.Regions.Add(new ArtifactRegion
                     {
@@ -164,9 +213,24 @@ public sealed class StandardArtifactDetector : IArtifactDetector
                         Y = y0,
                         Width = x1 - x0,
                         Height = y1 - y0,
-                        Severity = Math.Clamp((float)haloPixels / blockPixels, 0f, 1f),
+                        Severity = Math.Clamp((float)haloPixels / blockTotal, 0f, 1f),
                         SuggestedSourceFrame = dominantFrame,
-                        Description = $"Halo boundary artifact detected in {x0},{y0}"
+                        Description = $"Edge Defocus Halo ({haloPixels}px, Frame #{dominantFrame + 1})"
+                    });
+                }
+                else if (seamPixels > blockTotal * 0.10f)
+                {
+                    artifactMap.Regions.Add(new ArtifactRegion
+                    {
+                        Id = ++regionIdCounter,
+                        Type = ArtifactType.Seam,
+                        X = x0,
+                        Y = y0,
+                        Width = x1 - x0,
+                        Height = y1 - y0,
+                        Severity = Math.Clamp((float)seamPixels / blockTotal, 0f, 1f),
+                        SuggestedSourceFrame = dominantFrame,
+                        Description = $"Depth Boundary Seam ({seamPixels}px)"
                     });
                 }
             }
