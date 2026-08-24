@@ -3,29 +3,33 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-        <!-- Dark Theme Color Palette Tokens -->
-        <Color x:Key="BgDarkColor">#181825</Color>
-        <Color x:Key="BgPanelColor">#1E1E2E</Color>
-        <Color x:Key="BgCardColor">#252538</Color>
-        <Color x:Key="BgInputColor">#2E2E44</Color>
-        <Color x:Key="BorderDefaultColor">#3E3E58</Color>
-        <Color x:Key="PrimaryAccentColor">#89B4FA</Color>
-        <Color x:Key="SuccessAccentColor">#A6E3A1</Color>
-        <Color x:Key="WarningAccentColor">#F9E2AF</Color>
-        <Color x:Key="DangerAccentColor">#F38BA8</Color>
-        <Color x:Key="TextPrimaryColor">#CDD6F4</Color>
-        <Color x:Key="TextMutedColor">#7F849C</Color>
+        <!-- High-Contrast Dark Theme Color Palette Tokens -->
+        <Color x:Key="BgDarkColor">#0F111A</Color>
+        <Color x:Key="BgPanelColor">#161926</Color>
+        <Color x:Key="BgCardColor">#1E2235</Color>
+        <Color x:Key="BgInputColor">#282D44</Color>
+        <Color x:Key="BorderDefaultColor">#3A4161</Color>
+        <Color x:Key="BorderHoverColor">#60A5FA</Color>
+        <Color x:Key="PrimaryAccentColor">#3B82F6</Color>
+        <Color x:Key="SuccessAccentColor">#10B981</Color>
+        <Color x:Key="WarningAccentColor">#F59E0B</Color>
+        <Color x:Key="DangerAccentColor">#EF4444</Color>
+        <Color x:Key="TextPrimaryColor">#FFFFFF</Color>
+        <Color x:Key="TextSecondaryColor">#E2E8F0</Color>
+        <Color x:Key="TextMutedColor">#94A3B8</Color>
 
         <SolidColorBrush x:Key="BgDark" Color="{StaticResource BgDarkColor}" />
         <SolidColorBrush x:Key="BgPanel" Color="{StaticResource BgPanelColor}" />
         <SolidColorBrush x:Key="BgCard" Color="{StaticResource BgCardColor}" />
         <SolidColorBrush x:Key="BgInput" Color="{StaticResource BgInputColor}" />
         <SolidColorBrush x:Key="BorderDefault" Color="{StaticResource BorderDefaultColor}" />
+        <SolidColorBrush x:Key="BorderHover" Color="{StaticResource BorderHoverColor}" />
         <SolidColorBrush x:Key="PrimaryAccent" Color="{StaticResource PrimaryAccentColor}" />
         <SolidColorBrush x:Key="SuccessAccent" Color="{StaticResource SuccessAccentColor}" />
         <SolidColorBrush x:Key="WarningAccent" Color="{StaticResource WarningAccentColor}" />
         <SolidColorBrush x:Key="DangerAccent" Color="{StaticResource DangerAccentColor}" />
         <SolidColorBrush x:Key="TextPrimary" Color="{StaticResource TextPrimaryColor}" />
+        <SolidColorBrush x:Key="TextSecondary" Color="{StaticResource TextSecondaryColor}" />
         <SolidColorBrush x:Key="TextMuted" Color="{StaticResource TextMutedColor}" />
 
         <!-- Base Window Style -->
@@ -36,13 +40,14 @@
             <Setter Property="FontSize" Value="13" />
         </Style>
 
-        <!-- Modern Button Style -->
+        <!-- Modern High-Contrast Button Style -->
         <Style x:Key="ModernButton" TargetType="Button">
             <Setter Property="Background" Value="{StaticResource BgCard}" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderDefault}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Padding" Value="12,7" />
+            <Setter Property="FontWeight" Value="Medium" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
@@ -51,15 +56,15 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="6">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#32324A" />
-                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource PrimaryAccent}" />
+                                <Setter TargetName="border" Property="Background" Value="#2D334D" />
+                                <Setter TargetName="border" Property="BorderBrush" Value="{StaticResource BorderHover}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="border" Property="Background" Value="#25253A" />
+                                <Setter TargetName="border" Property="Background" Value="#1A1E30" />
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="border" Property="Opacity" Value="0.45" />
@@ -70,37 +75,64 @@
             </Setter>
         </Style>
 
-        <!-- Primary Glow Action Button -->
-        <Style x:Key="PrimaryActionButton" TargetType="Button" BasedOn="{StaticResource ModernButton}">
-            <Setter Property="Background" Value="#313E5C" />
-            <Setter Property="Foreground" Value="{StaticResource PrimaryAccent}" />
-            <Setter Property="BorderBrush" Value="{StaticResource PrimaryAccent}" />
-            <Setter Property="FontWeight" Value="SemiBold" />
+        <!-- Primary High-Contrast Action Button -->
+        <Style x:Key="PrimaryActionButton" TargetType="Button">
+            <Setter Property="Background" Value="#2563EB" />
+            <Setter Property="Foreground" Value="#FFFFFF" />
+            <Setter Property="BorderBrush" Value="#60A5FA" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="Padding" Value="16,10" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="border" Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="8">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#3B82F6" />
+                                <Setter TargetName="border" Property="BorderBrush" Value="#93C5FD" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="border" Property="Background" Value="#1D4ED8" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="border" Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
 
-        <!-- Dark Tab Button Style -->
+        <!-- High-Contrast Tab Radio Button Style -->
         <Style x:Key="TabRadioButton" TargetType="RadioButton">
             <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
             <Setter Property="Background" Value="Transparent" />
-            <Setter Property="Padding" Value="14,8" />
+            <Setter Property="Padding" Value="14,9" />
+            <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="RadioButton">
                         <Border x:Name="tabBorder" Background="{TemplateBinding Background}"
-                                BorderThickness="0,0,0,2" BorderBrush="Transparent"
-                                Padding="{TemplateBinding Padding}" CornerRadius="4,4,0,0">
+                                BorderThickness="0,0,0,3" BorderBrush="Transparent"
+                                Padding="{TemplateBinding Padding}" CornerRadius="6,6,0,0">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
-                                <Setter TargetName="tabBorder" Property="Background" Value="#28283E" />
+                                <Setter TargetName="tabBorder" Property="Background" Value="#252A40" />
                             </Trigger>
                             <Trigger Property="IsChecked" Value="True">
-                                <Setter Property="Foreground" Value="{StaticResource PrimaryAccent}" />
-                                <Setter TargetName="tabBorder" Property="BorderBrush" Value="{StaticResource PrimaryAccent}" />
+                                <Setter Property="Foreground" Value="#60A5FA" />
+                                <Setter TargetName="tabBorder" Property="BorderBrush" Value="#3B82F6" />
                                 <Setter TargetName="tabBorder" Property="Background" Value="{StaticResource BgCard}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
@@ -109,33 +141,37 @@
             </Setter>
         </Style>
 
-        <!-- Dark ComboBox Style -->
+        <!-- High-Contrast ComboBox Style -->
         <Style TargetType="ComboBox">
             <Setter Property="Background" Value="{StaticResource BgInput}" />
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
             <Setter Property="BorderBrush" Value="{StaticResource BorderDefault}" />
-            <Setter Property="Padding" Value="8,5" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="FontWeight" Value="Medium" />
         </Style>
 
-        <!-- Dark CheckBox Style -->
+        <!-- High-Contrast CheckBox Style -->
         <Style TargetType="CheckBox">
             <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+            <Setter Property="FontWeight" Value="Medium" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="VerticalContentAlignment" Value="Center" />
-            <Setter Property="Margin" Value="0,3" />
+            <Setter Property="Margin" Value="0,4" />
         </Style>
 
-        <!-- Dark Slider Style -->
+        <!-- High-Contrast Slider Style -->
         <Style TargetType="Slider">
             <Setter Property="Foreground" Value="{StaticResource PrimaryAccent}" />
+            <Setter Property="Margin" Value="0,2,0,8" />
         </Style>
 
-        <!-- Dark ProgressBar Style -->
+        <!-- High-Contrast ProgressBar Style -->
         <Style TargetType="ProgressBar">
             <Setter Property="Background" Value="{StaticResource BgInput}" />
             <Setter Property="Foreground" Value="{StaticResource PrimaryAccent}" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="Height" Value="6" />
+            <Setter Property="Height" Value="8" />
         </Style>
     </Application.Resources>
 </Application>

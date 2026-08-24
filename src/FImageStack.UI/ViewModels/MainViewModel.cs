@@ -7,6 +7,9 @@ using System.Windows.Media.Imaging;
 using FImageStack.Application.Services;
 using FImageStack.Core;
 using FImageStack.Core.Models;
+using FImageStack.Core.PostProcessing;
+using FImageStack.Core.Presets;
+using FImageStack.Core.Quality;
 using FImageStack.Infrastructure.IO;
 using FImageStack.UI.Common;
 using FImageStack.UI.Utils;
@@ -19,19 +22,25 @@ public sealed class MainViewModel : ViewModelBase
     private readonly IStackService _stackService;
     private readonly IProjectService _projectService;
     private readonly IImageIO _imageIO;
+    private readonly IPostProcessEngine _postProcessEngine;
 
     private CancellationTokenSource? _cts;
     private ProcessedStackResult? _lastResult;
+    private ImageBuffer<float>? _postProcessedBuffer;
 
     private bool _isProcessing;
     private double _progressPercentage;
     private string _currentStage = "Ready";
-    private string _statusMessage = "Select a folder or drag-and-drop focus bracket images.";
+    private string _statusMessage = "Select a folder or click a quick sample stack to begin.";
 
-    // Active Display Tab: 0=Fused, 1=Depth, 2=Confidence, 3=Motion, 4=Artifacts, 5=Source
+    // Active Display Tab: 0=Fused, 1=Depth, 2=Confidence, 3=Motion, 4=Artifacts, 5=Source, 6=Split Comparison
     private int _selectedViewTab = 0;
     private BitmapSource? _displayBitmap;
     private FrameItemViewModel? _selectedFrame;
+
+    // Presets
+    public ObservableCollection<StackingPreset> AvailablePresets { get; } = new();
+    private StackingPreset? _selectedPreset;
 
     // Fusion Settings
     private FusionMethod _selectedMethod = FusionMethod.MultiScalePyramid;
@@ -45,12 +54,26 @@ public sealed class MainViewModel : ViewModelBase
     private bool _enableTiledProcessing = false;
     private int _tileSize = 512;
 
-    // Metrics
+    // Split Comparison
+    private bool _isSplitComparisonActive;
+    private double _splitRatio = 0.5;
+
+    // Post-Processing Settings
+    private float _exposureCompensation = 0.0f;
+    private float _contrastAdjustment = 1.0f;
+    private float _clarityAdjustment = 0.0f;
+    private float _sharpeningAdjustment = 0.3f;
+    private float _saturationAdjustment = 1.0f;
+
+    // Metrics & Histogram
     private string _qualityScoreText = "--";
     private string _focusCoverageText = "--";
     private string _timingText = "--";
     private string _artifactsReportText = "--";
     private string _memoryUsageText = "--";
+    private BitmapSource? _histogramBitmap;
+    private string _shadowClippingText = "0.0%";
+    private string _highlightClippingText = "0.0%";
 
     public ObservableCollection<FrameItemViewModel> Frames { get; } = new();
 
@@ -99,6 +122,7 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsMotionTabSelected));
                 OnPropertyChanged(nameof(IsArtifactTabSelected));
                 OnPropertyChanged(nameof(IsSourceTabSelected));
+                OnPropertyChanged(nameof(IsSplitTabSelected));
                 UpdateDisplayBitmap();
             }
         }
@@ -140,6 +164,12 @@ public sealed class MainViewModel : ViewModelBase
         set { if (value) SelectedViewTab = 5; }
     }
 
+    public bool IsSplitTabSelected
+    {
+        get => SelectedViewTab == 6;
+        set { if (value) SelectedViewTab = 6; }
+    }
+
     public BitmapSource? DisplayBitmap
     {
         get => _displayBitmap;
@@ -153,7 +183,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedFrame, value))
             {
-                if (SelectedViewTab == 5)
+                if (SelectedViewTab == 5 || SelectedViewTab == 6)
                 {
                     UpdateDisplayBitmap();
                 }
@@ -161,7 +191,77 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
-    // Setting properties
+    public StackingPreset? SelectedPreset
+    {
+        get => _selectedPreset;
+        set
+        {
+            if (SetProperty(ref _selectedPreset, value) && value != null)
+            {
+                ApplyPreset(value);
+            }
+        }
+    }
+
+    public double SplitRatio
+    {
+        get => _splitRatio;
+        set
+        {
+            if (SetProperty(ref _splitRatio, value))
+            {
+                if (SelectedViewTab == 6) UpdateDisplayBitmap();
+            }
+        }
+    }
+
+    // Post-Processing Settings Properties
+    public float ExposureCompensation
+    {
+        get => _exposureCompensation;
+        set
+        {
+            if (SetProperty(ref _exposureCompensation, value)) ApplyLivePostProcessing();
+        }
+    }
+
+    public float ContrastAdjustment
+    {
+        get => _contrastAdjustment;
+        set
+        {
+            if (SetProperty(ref _contrastAdjustment, value)) ApplyLivePostProcessing();
+        }
+    }
+
+    public float ClarityAdjustment
+    {
+        get => _clarityAdjustment;
+        set
+        {
+            if (SetProperty(ref _clarityAdjustment, value)) ApplyLivePostProcessing();
+        }
+    }
+
+    public float SharpeningAdjustment
+    {
+        get => _sharpeningAdjustment;
+        set
+        {
+            if (SetProperty(ref _sharpeningAdjustment, value)) ApplyLivePostProcessing();
+        }
+    }
+
+    public float SaturationAdjustment
+    {
+        get => _saturationAdjustment;
+        set
+        {
+            if (SetProperty(ref _saturationAdjustment, value)) ApplyLivePostProcessing();
+        }
+    }
+
+    // Fusion Settings Properties
     public FusionMethod SelectedMethod
     {
         get => _selectedMethod;
@@ -253,6 +353,24 @@ public sealed class MainViewModel : ViewModelBase
         set => SetProperty(ref _memoryUsageText, value);
     }
 
+    public BitmapSource? HistogramBitmap
+    {
+        get => _histogramBitmap;
+        set => SetProperty(ref _histogramBitmap, value);
+    }
+
+    public string ShadowClippingText
+    {
+        get => _shadowClippingText;
+        set => SetProperty(ref _shadowClippingText, value);
+    }
+
+    public string HighlightClippingText
+    {
+        get => _highlightClippingText;
+        set => SetProperty(ref _highlightClippingText, value);
+    }
+
     // Cached Bitmap Sources
     public BitmapSource? FusedBitmap { get; private set; }
     public BitmapSource? DepthMapBitmap { get; private set; }
@@ -267,12 +385,20 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand CancelStackingCommand { get; }
     public ICommand ExportResultCommand { get; }
     public ICommand SelectAllFramesCommand { get; }
+    public ICommand ResetPostProcessingCommand { get; }
 
     public MainViewModel()
     {
         _imageIO = new ImageSharpIO();
         _projectService = new ProjectService();
         _stackService = new StackService(_imageIO);
+        _postProcessEngine = new StandardPostProcessEngine();
+
+        foreach (var p in StackingPreset.GetBuiltinPresets())
+        {
+            AvailablePresets.Add(p);
+        }
+        _selectedPreset = AvailablePresets[0];
 
         LoadFolderCommand = new RelayCommand(ExecuteLoadFolder);
         LoadSampleStackCommand = new RelayCommand(ExecuteLoadSampleStack);
@@ -285,12 +411,35 @@ public sealed class MainViewModel : ViewModelBase
             foreach (var f in Frames) f.IsSelected = anyUnchecked;
         });
 
+        ResetPostProcessingCommand = new RelayCommand(_ =>
+        {
+            ExposureCompensation = 0.0f;
+            ContrastAdjustment = 1.0f;
+            ClarityAdjustment = 0.0f;
+            SharpeningAdjustment = 0.3f;
+            SaturationAdjustment = 1.0f;
+        });
+
         // Try pre-loading test dataset if available
         string defaultSample = @"data\test_stack_50";
         if (Directory.Exists(defaultSample))
         {
             LoadFolder(defaultSample);
         }
+    }
+
+    private void ApplyPreset(StackingPreset preset)
+    {
+        SelectedMethod = preset.Settings.Method;
+        SelectedFocusMethod = preset.Settings.FocusMethod;
+        PyramidLevels = preset.Settings.PyramidLevels;
+        SmoothingRadius = preset.Settings.SmoothingRadius;
+        EnableQualityAnalysis = preset.Settings.EnableQualityAnalysis;
+        EnableMotionSuppression = preset.Settings.EnableMotionSuppression;
+        EnableArtifactDetection = preset.Settings.EnableArtifactDetection;
+        EnableAutoRepair = preset.Settings.EnableAutoRepair;
+        EnableTiledProcessing = preset.Settings.EnableTiledProcessing;
+        StatusMessage = $"Applied preset: {preset.Name}";
     }
 
     private void ExecuteLoadFolder()
@@ -381,11 +530,16 @@ public sealed class MainViewModel : ViewModelBase
         try
         {
             _lastResult?.Dispose();
+            _postProcessedBuffer?.Dispose();
+            _postProcessedBuffer = null;
+
             var result = await _stackService.ProcessStackAsync(activeFiles, settings, progress, _cts.Token);
             _lastResult = result;
 
-            // Generate Bitmaps on UI thread
-            FusedBitmap = BitmapHelper.ToBitmapSource(result.RepairedImage ?? result.FusedImage);
+            // Generate Bitmaps
+            var baseImg = result.RepairedImage ?? result.FusedImage;
+            ApplyLivePostProcessing();
+
             DepthMapBitmap = BitmapHelper.ToBitmapSource(result.DepthResult.DepthMap);
             ConfidenceMapBitmap = BitmapHelper.ToBitmapSource(result.DepthResult.ConfidenceMap);
             MotionMapBitmap = BitmapHelper.ToBitmapSource(result.MotionResult?.MotionMap);
@@ -427,6 +581,37 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    private void ApplyLivePostProcessing()
+    {
+        if (_lastResult == null) return;
+
+        var baseImg = _lastResult.RepairedImage ?? _lastResult.FusedImage;
+        _postProcessedBuffer?.Dispose();
+
+        var ppSettings = new PostProcessSettings
+        {
+            Exposure = ExposureCompensation,
+            Contrast = ContrastAdjustment,
+            Clarity = ClarityAdjustment,
+            SharpenAmount = SharpeningAdjustment,
+            Saturation = SaturationAdjustment
+        };
+
+        _postProcessedBuffer = _postProcessEngine.ApplyPostProcessing(baseImg, ppSettings);
+        FusedBitmap = BitmapHelper.ToBitmapSource(_postProcessedBuffer);
+
+        // Update live histogram
+        var hist = HistogramEngine.Compute(_postProcessedBuffer);
+        HistogramBitmap = BitmapHelper.RenderHistogramBitmap(hist);
+        ShadowClippingText = $"{hist.ShadowClippingPercent:F1}%";
+        HighlightClippingText = $"{hist.HighlightClippingPercent:F1}%";
+
+        if (SelectedViewTab == 0 || SelectedViewTab == 6)
+        {
+            UpdateDisplayBitmap();
+        }
+    }
+
     private void ExecuteCancelStacking()
     {
         _cts?.Cancel();
@@ -445,7 +630,7 @@ public sealed class MainViewModel : ViewModelBase
 
         if (saveDialog.ShowDialog() == true)
         {
-            var img = _lastResult.RepairedImage ?? _lastResult.FusedImage;
+            var img = _postProcessedBuffer ?? _lastResult.RepairedImage ?? _lastResult.FusedImage;
             int bitDepth = saveDialog.FileName.EndsWith(".tif", StringComparison.OrdinalIgnoreCase) || saveDialog.FileName.EndsWith(".tiff", StringComparison.OrdinalIgnoreCase) ? 16 : 8;
             _imageIO.SaveImage(img, saveDialog.FileName, bitDepth);
             MessageBox.Show($"Exported successfully to:\n{saveDialog.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -454,6 +639,21 @@ public sealed class MainViewModel : ViewModelBase
 
     private void UpdateDisplayBitmap()
     {
+        if (SelectedViewTab == 6)
+        {
+            // Split A/B Comparison: Fused (Left) vs Selected Source Frame (Right)
+            if (_postProcessedBuffer != null && SelectedFrame != null && File.Exists(SelectedFrame.FilePath))
+            {
+                using var srcFrame = _imageIO.LoadFrame(SelectedFrame.FilePath, SelectedFrame.Index);
+                DisplayBitmap = BitmapHelper.CreateSplitWipeComposite(_postProcessedBuffer, srcFrame.ColorBuffer, (float)SplitRatio);
+            }
+            else
+            {
+                DisplayBitmap = FusedBitmap;
+            }
+            return;
+        }
+
         DisplayBitmap = SelectedViewTab switch
         {
             0 => FusedBitmap,

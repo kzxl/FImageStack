@@ -4,9 +4,13 @@
         xmlns:vm="clr-namespace:FImageStack.UI.ViewModels"
         xmlns:core="clr-namespace:FImageStack.Core;assembly=FImageStack.Core"
         Title="FImageStack Pro — Intelligent Focus Fusion Engine"
-        Height="850" Width="1380"
-        MinHeight="650" MinWidth="1000"
+        Height="900" Width="1450"
+        MinHeight="700" MinWidth="1100"
         WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </Window.Resources>
 
     <Window.DataContext>
         <vm:MainViewModel />
@@ -30,24 +34,24 @@
 
                 <!-- Brand Title -->
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="28" Height="28" Background="{StaticResource PrimaryAccent}" CornerRadius="6" Margin="0,0,10,0">
-                        <TextBlock Text="⚡" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#181825" />
+                    <Border Width="30" Height="30" Background="{StaticResource PrimaryAccent}" CornerRadius="6" Margin="0,0,10,0">
+                        <TextBlock Text="⚡" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#FFFFFF" />
                     </Border>
-                    <TextBlock Text="FImageStack Pro" FontSize="16" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
-                    <Border Background="#2E334D" CornerRadius="4" Margin="10,0,0,0" Padding="6,2" VerticalAlignment="Center">
-                        <TextBlock Text="v2.0 Native Core" FontSize="11" Foreground="{StaticResource PrimaryAccent}" />
+                    <TextBlock Text="FImageStack Pro" FontSize="17" FontWeight="Bold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
+                    <Border Background="#1E284A" BorderBrush="{StaticResource PrimaryAccent}" BorderThickness="1" CornerRadius="4" Margin="10,0,0,0" Padding="8,2" VerticalAlignment="Center">
+                        <TextBlock Text="v2.0 Advanced Core" FontSize="11" FontWeight="Bold" Foreground="{StaticResource PrimaryAccent}" />
                     </Border>
                 </StackPanel>
 
                 <!-- Quick Load Sample Stacks -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Quick Samples:" Foreground="{StaticResource TextMuted}" VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <Button Content="20 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="20" Margin="0,0,6,0" Padding="8,4" />
-                    <Button Content="50 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="50" Margin="0,0,6,0" Padding="8,4" />
-                    <Button Content="100 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="100" Margin="0,0,6,0" Padding="8,4" />
-                    <Button Content="200 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="200" Margin="0,0,12,0" Padding="8,4" />
+                    <TextBlock Text="Quick Samples:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <Button Content="20 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="20" Margin="0,0,6,0" Padding="10,5" />
+                    <Button Content="50 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="50" Margin="0,0,6,0" Padding="10,5" />
+                    <Button Content="100 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="100" Margin="0,0,6,0" Padding="10,5" />
+                    <Button Content="200 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="200" Margin="0,0,12,0" Padding="10,5" />
 
-                    <Button Content="📂 Open Folder..." Style="{StaticResource ModernButton}" Command="{Binding LoadFolderCommand}" FontWeight="SemiBold" />
+                    <Button Content="📂 Open Folder..." Style="{StaticResource ModernButton}" Command="{Binding LoadFolderCommand}" FontWeight="Bold" Padding="12,6" />
                 </StackPanel>
             </Grid>
         </Border>
@@ -55,9 +59,9 @@
         <!-- 2. Main Work Area -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="280" MinWidth="220" MaxWidth="400" /> <!-- Left: Frames List -->
+                <ColumnDefinition Width="290" MinWidth="230" MaxWidth="420" /> <!-- Left: Frames List -->
                 <ColumnDefinition Width="*" />                                    <!-- Center: Image Canvas -->
-                <ColumnDefinition Width="340" MinWidth="280" MaxWidth="450" /> <!-- Right: Config & Diagnostics -->
+                <ColumnDefinition Width="380" MinWidth="320" MaxWidth="480" /> <!-- Right: Config, Post-Process & Diagnostics -->
             </Grid.ColumnDefinitions>
 
             <!-- A. Left Sidebar: Frame List -->
@@ -68,14 +72,14 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="12,8">
+                    <Border Grid.Row="0" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="14,10">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Frames.Count, StringFormat='Stack Frames ({0})'}" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
-                            <Button Grid.Column="1" Content="Toggle All" Style="{StaticResource ModernButton}" Command="{Binding SelectAllFramesCommand}" Padding="6,2" FontSize="11" />
+                            <TextBlock Text="{Binding Frames.Count, StringFormat='Stack Frames ({0})'}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="Toggle All" Style="{StaticResource ModernButton}" Command="{Binding SelectAllFramesCommand}" Padding="8,3" FontSize="11" />
                         </Grid>
                     </Border>
 
@@ -88,17 +92,17 @@
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="itemBorder" Background="{TemplateBinding Background}" CornerRadius="6" Margin="4,2" Padding="6">
+                                            <Border x:Name="itemBorder" Background="{TemplateBinding Background}" CornerRadius="6" Margin="6,2" Padding="6" BorderThickness="1" BorderBrush="Transparent">
                                                 <ContentPresenter />
                                             </Border>
                                             <ControlTemplate.Triggers>
                                                 <Trigger Property="IsMouseOver" Value="True">
-                                                    <Setter TargetName="itemBorder" Property="Background" Value="#2A2A40" />
+                                                    <Setter TargetName="itemBorder" Property="Background" Value="#252A42" />
+                                                    <Setter TargetName="itemBorder" Property="BorderBrush" Value="{StaticResource BorderDefault}" />
                                                 </Trigger>
                                                 <Trigger Property="IsSelected" Value="True">
-                                                    <Setter TargetName="itemBorder" Property="Background" Value="#323554" />
+                                                    <Setter TargetName="itemBorder" Property="Background" Value="#24335E" />
                                                     <Setter TargetName="itemBorder" Property="BorderBrush" Value="{StaticResource PrimaryAccent}" />
-                                                    <Setter TargetName="itemBorder" Property="BorderThickness" Value="1" />
                                                 </Trigger>
                                             </ControlTemplate.Triggers>
                                         </ControlTemplate>
@@ -111,19 +115,19 @@
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="60" />
+                                        <ColumnDefinition Width="65" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
 
-                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,8,0" />
 
-                                    <Border Grid.Column="1" Height="40" Background="#181825" CornerRadius="4" ClipToBounds="True" Margin="0,0,8,0">
+                                    <Border Grid.Column="1" Height="44" Background="#0A0C14" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="4" ClipToBounds="True" Margin="0,0,8,0">
                                         <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
                                     </Border>
 
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimary}" FontWeight="Medium" TextTrimming="CharacterEllipsis" FontSize="12" />
-                                        <TextBlock Text="{Binding Index, StringFormat='Frame #{0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" />
+                                        <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" FontSize="12" />
+                                        <TextBlock Text="{Binding Index, StringFormat='Frame #{0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0" />
                                     </StackPanel>
                                 </Grid>
                             </DataTemplate>
@@ -133,9 +137,10 @@
             </Border>
 
             <!-- B. Center Canvas: Multi-View Image Display -->
-            <Grid Grid.Column="1" Background="#12121A">
+            <Grid Grid.Column="1" Background="#0A0C14">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" /> <!-- Multi-view Tab Headers -->
+                    <RowDefinition Height="Auto" /> <!-- Split-Screen Comparison Bar (if active) -->
                     <RowDefinition Height="*" />    <!-- Main Image Viewport -->
                 </Grid.RowDefinitions>
 
@@ -143,58 +148,83 @@
                 <Border Grid.Row="0" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="12,4,12,0">
                     <StackPanel Orientation="Horizontal">
                         <RadioButton Content="✨ Fused Output" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsFusedTabSelected}" GroupName="ViewTabs" />
+                        <RadioButton Content="⚡ A/B Split View" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsSplitTabSelected}" GroupName="ViewTabs" ToolTip="Side-by-side comparison slider between Fused output and Selected frame" />
                         <RadioButton Content="🌐 Depth Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsDepthTabSelected}" GroupName="ViewTabs" />
                         <RadioButton Content="🎯 Confidence Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsConfidenceTabSelected}" GroupName="ViewTabs" />
                         <RadioButton Content="🍃 Motion Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsMotionTabSelected}" GroupName="ViewTabs" />
                         <RadioButton Content="🛡️ Artifacts &amp; Repair" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsArtifactTabSelected}" GroupName="ViewTabs" />
-                        <RadioButton Content="🖼️ Selected Source" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsSourceTabSelected}" GroupName="ViewTabs" />
+                        <RadioButton Content="🖼️ Source Frame" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsSourceTabSelected}" GroupName="ViewTabs" />
                     </StackPanel>
                 </Border>
 
+                <!-- Split-Screen Slider Bar -->
+                <Border Grid.Row="1" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="16,6"
+                        Visibility="{Binding IsSplitTabSelected, Converter={StaticResource BoolToVis}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="◀ Fused Output" Foreground="{StaticResource PrimaryAccent}" FontWeight="Bold" Margin="0,0,12,0" VerticalAlignment="Center" />
+                        <Slider Grid.Column="1" Minimum="0.0" Maximum="1.0" Value="{Binding SplitRatio}" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" Text="Source Frame ▶" Foreground="{StaticResource WarningAccent}" FontWeight="Bold" Margin="12,0,0,0" VerticalAlignment="Center" />
+                    </Grid>
+                </Border>
+
                 <!-- Main Image Viewport -->
-                <ScrollViewer Grid.Row="1" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10">
                         <!-- Image Display -->
                         <Image Source="{Binding DisplayBitmap}" Stretch="None" RenderOptions.BitmapScalingMode="HighQuality" />
                     </Grid>
                 </ScrollViewer>
             </Grid>
 
-            <!-- C. Right Sidebar: Settings & Diagnostics -->
+            <!-- C. Right Sidebar: Settings, Post-Processing, Diagnostics & Metrics -->
             <Border Grid.Column="2" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1,0,0,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
 
-                        <!-- 1. Strategy Card -->
-                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,14">
+                        <!-- 1. Preset Profile Card -->
+                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock Text="⚙️ FUSION STRATEGY" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,10" />
+                                <TextBlock Text="🎯 PRESET PROFILE" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,8" />
+                                <ComboBox ItemsSource="{Binding AvailablePresets}" SelectedItem="{Binding SelectedPreset}" DisplayMemberPath="Name" Margin="0,0,0,6" />
+                                <TextBlock Text="{Binding SelectedPreset.Description}" Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
 
-                                <TextBlock Text="Fusion Algorithm:" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4" />
+                        <!-- 2. Strategy Card -->
+                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="⚙️ FUSION STRATEGY" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,10,0" />
+
+                                <TextBlock Text="Fusion Algorithm:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,4" />
                                 <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedMethod}" Margin="0,0,0,10">
                                     <ComboBoxItem Content="Multi-Scale Laplacian Pyramid" Tag="{x:Static core:FusionMethod.MultiScalePyramid}" IsSelected="True" />
                                     <ComboBoxItem Content="Focus-Weighted Continuous Blend" Tag="{x:Static core:FusionMethod.FocusWeighted}" />
                                     <ComboBoxItem Content="Winner-Takes-All (WTA Fast)" Tag="{x:Static core:FusionMethod.WinnerTakesAll}" />
                                 </ComboBox>
 
-                                <TextBlock Text="Focus Measure Method:" Foreground="{StaticResource TextMuted}" Margin="0,0,0,4" />
-                                <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedFocusMethod}" Margin="0,0,0,12">
+                                <TextBlock Text="Focus Measure Method:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,4" />
+                                <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedFocusMethod}" Margin="0,0,0,10">
                                     <ComboBoxItem Content="Modified Laplacian (SML Edge)" Tag="{x:Static core:FocusMeasureMethod.ModifiedLaplacian}" IsSelected="True" />
                                     <ComboBoxItem Content="Tenengrad (Sobel Gradient)" Tag="{x:Static core:FocusMeasureMethod.Tenengrad}" />
                                 </ComboBox>
 
                                 <Grid Margin="0,0,0,4">
-                                    <TextBlock Text="Pyramid Decomposition Levels:" Foreground="{StaticResource TextMuted}" />
+                                    <TextBlock Text="Pyramid Decomposition Levels:" Foreground="{StaticResource TextSecondary}" />
                                     <TextBlock Text="{Binding PyramidLevels}" Foreground="{StaticResource PrimaryAccent}" HorizontalAlignment="Right" FontWeight="Bold" />
                                 </Grid>
-                                <Slider Minimum="3" Maximum="7" Value="{Binding PyramidLevels}" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,0,0,8" />
+                                <Slider Minimum="3" Maximum="7" Value="{Binding PyramidLevels}" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,0,4,0" />
                             </StackPanel>
                         </Border>
 
-                        <!-- 2. Intelligent Diagnostics Card -->
-                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,14">
+                        <!-- 3. Intelligent Diagnostics Card -->
+                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock Text="🧠 INTELLIGENT DIAGNOSTICS" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,10" />
+                                <TextBlock Text="🧠 INTELLIGENT DIAGNOSTICS" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,8,0" />
 
                                 <CheckBox Content="Motion-Aware Ghost Suppression" IsChecked="{Binding EnableMotionSuppression}" ToolTip="Prevents ghosting on leaves and moving insect parts by locking to single sharpest frame" />
                                 <CheckBox Content="Stack Quality &amp; Gap Analyzer" IsChecked="{Binding EnableQualityAnalysis}" ToolTip="Evaluates focus coverage and alerts missing focal planes" />
@@ -203,41 +233,95 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 3. Primary Action Buttons -->
-                        <Button Content="▶  START FOCUS STACKING" Style="{StaticResource PrimaryActionButton}" Command="{Binding StartStackingCommand}" Margin="0,0,0,8" Height="42" FontSize="14" />
-                        <Grid Margin="0,0,0,14">
+                        <!-- 4. Post-Processing & Clarity Card -->
+                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <TextBlock Text="🎨 POST-PROCESSING &amp; CLARITY" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
+                                    <Button Content="Reset" Style="{StaticResource ModernButton}" Command="{Binding ResetPostProcessingCommand}" HorizontalAlignment="Right" Padding="6,2" FontSize="10" />
+                                </Grid>
+
+                                <Grid Margin="0,0,0,2">
+                                    <TextBlock Text="Exposure (-2 to +2 EV):" Foreground="{StaticResource TextSecondary}" FontSize="12" />
+                                    <TextBlock Text="{Binding ExposureCompensation, StringFormat='{}{0:F2} EV'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
+                                </Grid>
+                                <Slider Minimum="-2.0" Maximum="2.0" Value="{Binding ExposureCompensation}" SmallChange="0.1" />
+
+                                <Grid Margin="0,0,0,2">
+                                    <TextBlock Text="Contrast:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
+                                    <TextBlock Text="{Binding ContrastAdjustment, StringFormat='{}{0:F2}x'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
+                                </Grid>
+                                <Slider Minimum="0.5" Maximum="2.0" Value="{Binding ContrastAdjustment}" SmallChange="0.05" />
+
+                                <Grid Margin="0,0,0,2">
+                                    <TextBlock Text="Clarity &amp; Micro-Contrast:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
+                                    <TextBlock Text="{Binding ClarityAdjustment, StringFormat='{}{0:F2}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
+                                </Grid>
+                                <Slider Minimum="0.0" Maximum="1.0" Value="{Binding ClarityAdjustment}" SmallChange="0.05" />
+
+                                <Grid Margin="0,0,0,2">
+                                    <TextBlock Text="Unsharp Mask Sharpening:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
+                                    <TextBlock Text="{Binding SharpeningAdjustment, StringFormat='{}{0:F2}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
+                                </Grid>
+                                <Slider Minimum="0.0" Maximum="1.5" Value="{Binding SharpeningAdjustment}" SmallChange="0.05" />
+
+                                <Grid Margin="0,0,0,2">
+                                    <TextBlock Text="Saturation:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
+                                    <TextBlock Text="{Binding SaturationAdjustment, StringFormat='{}{0:F2}x'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
+                                </Grid>
+                                <Slider Minimum="0.0" Maximum="2.0" Value="{Binding SaturationAdjustment}" SmallChange="0.05" />
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 5. Primary Action Buttons -->
+                        <Button Content="▶  START FOCUS STACKING" Style="{StaticResource PrimaryActionButton}" Command="{Binding StartStackingCommand}" Margin="0,0,0,8" Height="44" FontSize="14" />
+                        <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="🛑 Cancel" Style="{StaticResource ModernButton}" Command="{Binding CancelStackingCommand}" Margin="0,0,4,0" />
-                            <Button Grid.Column="1" Content="💾 Export Image" Style="{StaticResource ModernButton}" Command="{Binding ExportResultCommand}" Margin="4,0,0,0" FontWeight="SemiBold" />
+                            <Button Grid.Column="0" Content="🛑 Cancel" Style="{StaticResource ModernButton}" Command="{Binding CancelStackingCommand}" Margin="0,0,4,0" FontWeight="SemiBold" />
+                            <Button Grid.Column="1" Content="💾 Export Image" Style="{StaticResource ModernButton}" Command="{Binding ExportResultCommand}" Margin="4,0,0,0" FontWeight="Bold" />
                         </Grid>
 
-                        <!-- 4. Quality & Benchmark Metrics Card -->
-                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14">
+                        <!-- 6. Quality & Performance Card -->
+                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                             <StackPanel>
-                                <TextBlock Text="📊 QUALITY &amp; PERFORMANCE" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,10" />
+                                <TextBlock Text="📊 QUALITY &amp; PERFORMANCE" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,10,0" />
 
                                 <Grid Margin="0,0,0,6">
-                                    <TextBlock Text="Overall Quality Score:" Foreground="{StaticResource TextMuted}" />
+                                    <TextBlock Text="Overall Quality Score:" Foreground="{StaticResource TextSecondary}" />
                                     <TextBlock Text="{Binding QualityScoreText}" Foreground="{StaticResource SuccessAccent}" FontWeight="Bold" HorizontalAlignment="Right" />
                                 </Grid>
                                 <Grid Margin="0,0,0,6">
-                                    <TextBlock Text="Focus Coverage:" Foreground="{StaticResource TextMuted}" />
-                                    <TextBlock Text="{Binding FocusCoverageText}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" />
+                                    <TextBlock Text="Focus Coverage:" Foreground="{StaticResource TextSecondary}" />
+                                    <TextBlock Text="{Binding FocusCoverageText}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" HorizontalAlignment="Right" />
                                 </Grid>
                                 <Grid Margin="0,0,0,6">
-                                    <TextBlock Text="Artifacts &amp; Repairs:" Foreground="{StaticResource TextMuted}" />
-                                    <TextBlock Text="{Binding ArtifactsReportText}" Foreground="{StaticResource WarningAccent}" HorizontalAlignment="Right" />
+                                    <TextBlock Text="Artifacts &amp; Repairs:" Foreground="{StaticResource TextSecondary}" />
+                                    <TextBlock Text="{Binding ArtifactsReportText}" Foreground="{StaticResource WarningAccent}" FontWeight="SemiBold" HorizontalAlignment="Right" />
                                 </Grid>
                                 <Grid Margin="0,0,0,6">
-                                    <TextBlock Text="Total Execution Time:" Foreground="{StaticResource TextMuted}" />
-                                    <TextBlock Text="{Binding TimingText}" Foreground="{StaticResource PrimaryAccent}" HorizontalAlignment="Right" />
+                                    <TextBlock Text="Total Execution Time:" Foreground="{StaticResource TextSecondary}" />
+                                    <TextBlock Text="{Binding TimingText}" Foreground="{StaticResource PrimaryAccent}" FontWeight="Bold" HorizontalAlignment="Right" />
                                 </Grid>
                                 <Grid Margin="0,0,0,0">
-                                    <TextBlock Text="Peak Memory Working Set:" Foreground="{StaticResource TextMuted}" />
-                                    <TextBlock Text="{Binding MemoryUsageText}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" />
+                                    <TextBlock Text="Peak Memory Working Set:" Foreground="{StaticResource TextSecondary}" />
+                                    <TextBlock Text="{Binding MemoryUsageText}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 7. Live Dynamic Histogram Card -->
+                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14">
+                            <StackPanel>
+                                <TextBlock Text="📈 LUMINANCE HISTOGRAM" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,8,0" />
+                                <Border Background="#0A0C14" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="4" Height="80" ClipToBounds="True" Margin="0,0,0,6">
+                                    <Image Source="{Binding HistogramBitmap}" Stretch="Fill" />
+                                </Border>
+                                <Grid>
+                                    <TextBlock Text="{Binding ShadowClippingText, StringFormat='Shadow Clip: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" />
+                                    <TextBlock Text="{Binding HighlightClippingText, StringFormat='Highlight Clip: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" HorizontalAlignment="Right" />
                                 </Grid>
                             </StackPanel>
                         </Border>
@@ -248,16 +332,16 @@
         </Grid>
 
         <!-- 3. Bottom Status Bar -->
-        <Border Grid.Row="2" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,1,0,0" Padding="16,6">
+        <Border Grid.Row="2" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,1,0,0" Padding="16,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="250" />
+                    <ColumnDefinition Width="260" />
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="{Binding CurrentStage, StringFormat='[{0}]'}" Foreground="{StaticResource PrimaryAccent}" FontWeight="SemiBold" Margin="0,0,8,0" />
-                    <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextPrimary}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding CurrentStage, StringFormat='[{0}]'}" Foreground="{StaticResource PrimaryAccent}" FontWeight="Bold" Margin="0,0,8,0" />
+                    <TextBlock Text="{Binding StatusMessage}" Foreground="{StaticResource TextPrimary}" FontWeight="Medium" TextTrimming="CharacterEllipsis" />
                 </StackPanel>
 
                 <Grid Grid.Column="1" VerticalAlignment="Center">
