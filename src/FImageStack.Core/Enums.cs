@@ -49,3 +49,19 @@ public enum ArtifactType
     LowConfidence,
     FocusGap
 }
+
+public enum ToneMappingOperator
+{
+    ACESFilmic,
+    ReinhardExtended,
+    LinearPreserve,
+    AgX
+}
+
+public enum BayerPatternType
+{
+    RGGB,
+    BGGR,
+    GRBG,
+    GBRG
+}

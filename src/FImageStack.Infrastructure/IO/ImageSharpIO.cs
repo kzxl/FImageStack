@@ -1,6 +1,7 @@
 using FImageStack.Core;
 using FImageStack.Core.Models;
 using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Tiff;
 using SixLabors.ImageSharp.PixelFormats;
 
 namespace FImageStack.Infrastructure.IO;
@@ -13,11 +14,53 @@ public interface IImageIO
 
 public sealed class ImageSharpIO : IImageIO
 {
+    private readonly IRawDecoderEngine _rawDecoder;
+
+    public ImageSharpIO(IRawDecoderEngine? rawDecoder = null)
+    {
+        _rawDecoder = rawDecoder ?? new RawDecoderEngine();
+    }
+
     public unsafe StackFrame LoadFrame(string filePath, int index)
     {
         if (!File.Exists(filePath))
             throw new FileNotFoundException("Image file not found.", filePath);
 
+        // Native RAW Decoder Flow
+        if (_rawDecoder.IsRawFile(filePath))
+        {
+            var rawColor = _rawDecoder.LoadRawImage(filePath);
+            int rw = rawColor.Width;
+            int rh = rawColor.Height;
+
+            var rawGray = new ImageBuffer<float>(rw, rh, 1, PixelFormatType.GrayFloat32);
+            float* rcPtr = rawColor.DataPointer;
+            float* rgPtr = rawGray.DataPointer;
+
+            Parallel.For(0, rh, y =>
+            {
+                int rowOffset = y * rw;
+                for (int x = 0; x < rw; x++)
+                {
+                    int cIdx = (rowOffset + x) * 3;
+                    rgPtr[rowOffset + x] = 0.2126f * rcPtr[cIdx] + 0.7152f * rcPtr[cIdx + 1] + 0.0722f * rcPtr[cIdx + 2];
+                }
+            });
+
+            return new StackFrame
+            {
+                Index = index,
+                FilePath = filePath,
+                Width = rw,
+                Height = rh,
+                BitDepth = 16,
+                Format = PixelFormatType.RgbFloat32,
+                ColorBuffer = rawColor,
+                GrayBuffer = rawGray
+            };
+        }
+
+        // Standard Image Loading (JPEG, PNG, TIFF)
         using var image = Image.Load<Rgb24>(filePath);
         int width = image.Width;
         int height = image.Height;
@@ -79,8 +122,9 @@ public sealed class ImageSharpIO : IImageIO
             Directory.CreateDirectory(dir);
         }
 
-        if (bitDepth == 16)
+        if (bitDepth >= 16)
         {
+            // 16-bit Pro / 32-bit Float Pipeline
             using var image = new Image<Rgb48>(width, height);
             image.ProcessPixelRows(accessor =>
             {
@@ -100,7 +144,19 @@ public sealed class ImageSharpIO : IImageIO
                     }
                 }
             });
-            image.Save(outputPath);
+
+            if (outputPath.EndsWith(".tif", StringComparison.OrdinalIgnoreCase) || outputPath.EndsWith(".tiff", StringComparison.OrdinalIgnoreCase))
+            {
+                var encoder = new TiffEncoder
+                {
+                    BitsPerPixel = TiffBitsPerPixel.Bit48
+                };
+                image.SaveAsTiff(outputPath, encoder);
+            }
+            else
+            {
+                image.Save(outputPath);
+            }
         }
         else
         {

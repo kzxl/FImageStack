@@ -13,7 +13,8 @@ public sealed class ProjectService : IProjectService
 {
     private static readonly HashSet<string> SupportedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp"
+        ".jpg", ".jpeg", ".png", ".tif", ".tiff", ".bmp",
+        ".cr2", ".cr3", ".nef", ".arw", ".dng", ".orf", ".raf", ".rw2", ".pef"
     };
 
     public List<string> DiscoverImageFiles(string directoryPath)

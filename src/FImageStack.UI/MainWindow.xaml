@@ -349,6 +349,14 @@
                                     <Button Content="Reset" Style="{StaticResource ModernButton}" Command="{Binding ResetPostProcessingCommand}" HorizontalAlignment="Right" Padding="6,2" FontSize="10" />
                                 </Grid>
 
+                                <TextBlock Text="Tone Mapping Curve (HDR &amp; RAW):" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,4" />
+                                <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedToneMapping}" Margin="0,0,0,8">
+                                    <ComboBoxItem Content="ACES Filmic (Cinema &amp; Studio)" Tag="{x:Static core:ToneMappingOperator.ACESFilmic}" IsSelected="True" />
+                                    <ComboBoxItem Content="Reinhard Extended (Smooth Highlights)" Tag="{x:Static core:ToneMappingOperator.ReinhardExtended}" />
+                                    <ComboBoxItem Content="AgX High-Dynamic Curve" Tag="{x:Static core:ToneMappingOperator.AgX}" />
+                                    <ComboBoxItem Content="Linear RAW (Preserve Direct)" Tag="{x:Static core:ToneMappingOperator.LinearPreserve}" />
+                                </ComboBox>
+
                                 <Grid Margin="0,0,0,2">
                                     <TextBlock Text="Exposure (-2 to +2 EV):" Foreground="{StaticResource TextSecondary}" FontSize="12" />
                                     <TextBlock Text="{Binding ExposureCompensation, StringFormat='{}{0:F2} EV'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />

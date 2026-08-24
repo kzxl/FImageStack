@@ -104,6 +104,7 @@ public sealed class MainViewModel : ViewModelBase
     private float _clarityAdjustment = 0.0f;
     private float _sharpeningAdjustment = 0.3f;
     private float _saturationAdjustment = 1.0f;
+    private ToneMappingOperator _selectedToneMapping = ToneMappingOperator.ACESFilmic;
 
     // Metrics & Histogram
     private string _qualityScoreText = "--";
@@ -355,6 +356,15 @@ public sealed class MainViewModel : ViewModelBase
         set
         {
             if (SetProperty(ref _saturationAdjustment, value)) ApplyLivePostProcessing();
+        }
+    }
+
+    public ToneMappingOperator SelectedToneMapping
+    {
+        get => _selectedToneMapping;
+        set
+        {
+            if (SetProperty(ref _selectedToneMapping, value)) ApplyLivePostProcessing();
         }
     }
 
@@ -932,7 +942,8 @@ public sealed class MainViewModel : ViewModelBase
             Contrast = ContrastAdjustment,
             Clarity = ClarityAdjustment,
             SharpenAmount = SharpeningAdjustment,
-            Saturation = SaturationAdjustment
+            Saturation = SaturationAdjustment,
+            ToneMapping = SelectedToneMapping
         };
 
         _postProcessedBuffer = _postProcessEngine.ApplyPostProcessing(baseImg, ppSettings);
@@ -961,17 +972,23 @@ public sealed class MainViewModel : ViewModelBase
 
         var saveDialog = new SaveFileDialog
         {
-            Title = "Export Fused Image",
-            Filter = "PNG Image (*.png)|*.png|TIFF 16-bit (*.tif;*.tiff)|*.tif|JPEG Image (*.jpg)|*.jpg",
-            FileName = "fused_output.png"
+            Title = "Export Master Image",
+            Filter = "TIFF 16-bit Master (*.tif)|*.tif|TIFF 32-bit Float HDR (*.tif)|*.tif|PNG 16-bit Lossless (*.png)|*.png|JPEG High-Q (*.jpg)|*.jpg",
+            FileName = "fused_master.tif"
         };
 
         if (saveDialog.ShowDialog() == true)
         {
             var img = _postProcessedBuffer ?? _lastResult.RepairedImage ?? _lastResult.FusedImage;
-            int bitDepth = saveDialog.FileName.EndsWith(".tif", StringComparison.OrdinalIgnoreCase) || saveDialog.FileName.EndsWith(".tiff", StringComparison.OrdinalIgnoreCase) ? 16 : 8;
+            int bitDepth = saveDialog.FilterIndex switch
+            {
+                1 => 16,
+                2 => 32,
+                3 => 16,
+                _ => 8
+            };
             _imageIO.SaveImage(img, saveDialog.FileName, bitDepth);
-            MessageBox.Show($"Exported successfully to:\n{saveDialog.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show($"Exported successfully ({bitDepth}-bit) to:\n{saveDialog.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
         }
     }
 

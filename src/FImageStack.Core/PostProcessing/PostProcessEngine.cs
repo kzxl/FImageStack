@@ -9,6 +9,7 @@ public sealed class PostProcessSettings
     public float Clarity { get; set; } = 0.0f;        // 0.0 to 1.0 (local contrast)
     public float SharpenAmount { get; set; } = 0.3f;  // 0.0 to 1.5
     public float Saturation { get; set; } = 1.0f;     // 0.0 to 2.0
+    public ToneMappingOperator ToneMapping { get; set; } = ToneMappingOperator.ACESFilmic;
     public bool EnableAutoLevels { get; set; } = false;
 }
 
@@ -19,22 +20,25 @@ public interface IPostProcessEngine
 
 public sealed class StandardPostProcessEngine : IPostProcessEngine
 {
+    private readonly IToneMappingEngine _toneMapper = new ToneMappingEngine();
+
     public unsafe ImageBuffer<float> ApplyPostProcessing(ImageBuffer<float> input, PostProcessSettings settings)
     {
         int width = input.Width;
         int height = input.Height;
         int channels = input.Channels;
 
-        var output = input.Clone();
-        float* outPtr = output.DataPointer;
-        float* inPtr = input.DataPointer;
+        // 0. Tone Mapping from Linear HDR Space
+        using var toneMapped = _toneMapper.ApplyToneMapping(input, settings.ToneMapping, settings.Exposure);
 
-        float expMultiplier = MathF.Pow(2.0f, settings.Exposure);
+        var output = toneMapped.Clone();
+        float* outPtr = output.DataPointer;
+
         float contrast = settings.Contrast;
         float saturation = settings.Saturation;
         float sharpen = settings.SharpenAmount;
 
-        // 1. Exposure, Contrast & Saturation in-place
+        // 1. Contrast & Saturation in-place
         Parallel.For(0, height, y =>
         {
             int rowOffset = y * width * channels;
@@ -44,9 +48,9 @@ public sealed class StandardPostProcessEngine : IPostProcessEngine
 
                 if (channels >= 3)
                 {
-                    float r = outPtr[idx] * expMultiplier;
-                    float g = outPtr[idx + 1] * expMultiplier;
-                    float b = outPtr[idx + 2] * expMultiplier;
+                    float r = outPtr[idx];
+                    float g = outPtr[idx + 1];
+                    float b = outPtr[idx + 2];
 
                     // Contrast around 0.5 midpoint
                     r = (r - 0.5f) * contrast + 0.5f;
@@ -65,7 +69,7 @@ public sealed class StandardPostProcessEngine : IPostProcessEngine
                 }
                 else
                 {
-                    float val = outPtr[idx] * expMultiplier;
+                    float val = outPtr[idx];
                     val = (val - 0.5f) * contrast + 0.5f;
                     outPtr[idx] = Math.Clamp(val, 0f, 1f);
                 }
