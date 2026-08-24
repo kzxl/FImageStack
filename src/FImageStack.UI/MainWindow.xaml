@@ -170,6 +170,7 @@
                                 <RadioButton Content="🎯 Confidence Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsConfidenceTabSelected}" GroupName="ViewTabs" />
                                 <RadioButton Content="🚫 Invalid &amp; Gaps" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsInvalidTabSelected}" GroupName="ViewTabs" ToolTip="Out-of-focus background and missing focus planes" />
                                 <RadioButton Content="🍃 Motion Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsMotionTabSelected}" GroupName="ViewTabs" />
+                                <RadioButton Content="🌐 DOF Volume Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsDofVolumeTabSelected}" GroupName="ViewTabs" ToolTip="Focus Volume Depth-of-Field thickness and focus coverage map" />
                                 <RadioButton Content="🛡️ Artifacts &amp; Repair" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsArtifactTabSelected}" GroupName="ViewTabs" />
                                 <RadioButton Content="🖼️ Source Frame" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsSourceTabSelected}" GroupName="ViewTabs" />
                             </StackPanel>
@@ -214,18 +215,25 @@
                             Background="#DD161926" BorderBrush="{StaticResource BorderHover}" BorderThickness="1"
                             CornerRadius="8" Padding="12,8"
                             Visibility="{Binding InspectorInfo, Converter={StaticResource BoolToVis}}">
-                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <Border Background="{StaticResource PrimaryAccent}" CornerRadius="4" Padding="6,2" Margin="0,0,10,0">
-                                <TextBlock Text="🔍 PROBE" FontWeight="Bold" FontSize="11" Foreground="#FFFFFF" />
-                            </Border>
-                            <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="12" VerticalAlignment="Center">
-                                <Run Text="Coord: (" /><Run Text="{Binding InspectorInfo.PixelX, Mode=OneWay}" FontWeight="Bold" Foreground="#FFFFFF" /><Run Text="," /><Run Text="{Binding InspectorInfo.PixelY, Mode=OneWay}" FontWeight="Bold" Foreground="#FFFFFF" /><Run Text=")  |  " />
-                                <Run Text="Source Frame: " /><Run Text="{Binding InspectorInfo.SourceFrameFileName, Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource PrimaryAccent}" /><Run Text="  |  " />
-                                <Run Text="Depth Z: " /><Run Text="{Binding InspectorInfo.DepthZ, StringFormat='{}{0:F2}', Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource WarningAccent}" /><Run Text="  |  " />
-                                <Run Text="Conf: " /><Run Text="{Binding InspectorInfo.ConfidencePercentage, StringFormat='{}{0:F0}%', Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource SuccessAccent}" /><Run Text=" " />
-                                <Run Text="{Binding InspectorInfo.StatusBadge, Mode=OneWay}" FontWeight="SemiBold" />
+                        <StackPanel Orientation="Vertical">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                <Border Background="{StaticResource PrimaryAccent}" CornerRadius="4" Padding="6,2" Margin="0,0,10,0">
+                                    <TextBlock Text="🔍 PROBE" FontWeight="Bold" FontSize="11" Foreground="#FFFFFF" />
+                                </Border>
+                                <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="12" VerticalAlignment="Center">
+                                    <Run Text="Coord: (" /><Run Text="{Binding InspectorInfo.PixelX, Mode=OneWay}" FontWeight="Bold" Foreground="#FFFFFF" /><Run Text="," /><Run Text="{Binding InspectorInfo.PixelY, Mode=OneWay}" FontWeight="Bold" Foreground="#FFFFFF" /><Run Text=")  |  " />
+                                    <Run Text="Peak: " /><Run Text="{Binding InspectorInfo.SourceFrameFileName, Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource PrimaryAccent}" /><Run Text="  |  " />
+                                    <Run Text="Sub-Frame: " /><Run Text="{Binding InspectorInfo.SubFrameIndex, StringFormat='{}{0:F2}', Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource WarningAccent}" /><Run Text="  |  " />
+                                    <Run Text="DOF: " /><Run Text="{Binding InspectorInfo.DofThickness, StringFormat='{}{0:F2} slices', Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource SuccessAccent}" /><Run Text="  |  " />
+                                    <Run Text="Conf: " /><Run Text="{Binding InspectorInfo.ConfidencePercentage, StringFormat='{}{0:F0}%', Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource SuccessAccent}" /><Run Text=" " />
+                                    <Run Text="{Binding InspectorInfo.StatusBadge, Mode=OneWay}" FontWeight="SemiBold" />
+                                </TextBlock>
+                                <Button Content="👁️ View Frame" Style="{StaticResource ModernButton}" Command="{Binding JumpToInspectedFrameCommand}" Margin="12,0,0,0" Padding="8,3" FontSize="11" />
+                            </StackPanel>
+                            <TextBlock Margin="0,4,0,0" Foreground="{StaticResource TextMuted}" FontSize="11" Visibility="{Binding InspectorInfo.HasFocusCurve, Converter={StaticResource BoolToVis}}">
+                                <Run Text="Focus Volume Profile: " Foreground="{StaticResource PrimaryAccent}" FontWeight="SemiBold" />
+                                <Run Text="{Binding InspectorInfo.FocusCurveSummary, Mode=OneWay}" Foreground="#E2E8F0" FontFamily="Consolas, Monospace" />
                             </TextBlock>
-                            <Button Content="👁️ View Frame" Style="{StaticResource ModernButton}" Command="{Binding JumpToInspectedFrameCommand}" Margin="12,0,0,0" Padding="8,3" FontSize="11" />
                         </StackPanel>
                     </Border>
                 </Grid>

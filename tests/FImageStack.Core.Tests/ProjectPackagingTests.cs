@@ -3,6 +3,7 @@ using FImageStack.Application.Services;
 using FImageStack.Core;
 using FImageStack.Core.DepthMap;
 using FImageStack.Core.Models;
+using FImageStack.Core.PostProcessing;
 using FImageStack.Core.Project;
 using FImageStack.Core.Retouch;
 using Xunit;
@@ -39,7 +40,7 @@ public class ProjectPackagingTests
                     Exposure = 0.5f,
                     Contrast = 1.2f,
                     Clarity = 0.4f,
-                    Sharpening = 0.8f,
+                    SharpenAmount = 0.8f,
                     ToneMapping = ToneMappingOperator.ACESFilmic
                 }
             };

@@ -360,6 +360,69 @@ public static class BitmapHelper
         return wb;
     }
 
+    /// <summary>
+    /// Renders Depth-of-Field (DOF) Thickness / Focus Volume Coverage Map using a rich Viridis pseudo-color gradient.
+    /// </summary>
+    public static unsafe BitmapSource? ToDofThicknessBitmap(
+        ImageBuffer<float>? dofMap,
+        ImageBuffer<float>? confidenceMap = null,
+        float invalidConfidenceThreshold = 0.12f)
+    {
+        if (dofMap == null) return null;
+
+        int width = dofMap.Width;
+        int height = dofMap.Height;
+
+        var wb = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgr32, null);
+        wb.Lock();
+
+        byte* backBuffer = (byte*)wb.BackBuffer;
+        int backBufferStride = wb.BackBufferStride;
+        float* dofData = dofMap.DataPointer;
+        float* confData = confidenceMap != null ? confidenceMap.DataPointer : null;
+
+        Parallel.For(0, height, y =>
+        {
+            byte* dstRow = backBuffer + y * backBufferStride;
+            int rowOffset = y * width;
+
+            for (int x = 0; x < width; x++)
+            {
+                int idx = rowOffset + x;
+                float dof = Math.Clamp(dofData[idx], 0f, 1f);
+                float conf = confData != null ? confData[idx] : 1.0f;
+                int dstIdx = x * 4;
+
+                if (conf < invalidConfidenceThreshold)
+                {
+                    byte bg = (byte)(((x / 8 + y / 8) % 2 == 0) ? 20 : 12);
+                    dstRow[dstIdx] = bg;
+                    dstRow[dstIdx + 1] = bg;
+                    dstRow[dstIdx + 2] = bg;
+                    dstRow[dstIdx + 3] = 255;
+                }
+                else
+                {
+                    // Viridis-style gradient: Purple (Thin DOF) -> Teal (Normal DOF) -> Yellow (Thick/Deep DOF)
+                    byte r = (byte)Math.Clamp((int)(255f * MathF.Pow(dof, 1.2f) + 30f * (1f - dof)), 0, 255);
+                    byte g = (byte)Math.Clamp((int)(220f * MathF.Sin(dof * MathF.PI * 0.8f + 0.2f)), 0, 255);
+                    byte b = (byte)Math.Clamp((int)(200f * (1f - dof * 0.8f) + 40f), 0, 255);
+
+                    dstRow[dstIdx] = b;
+                    dstRow[dstIdx + 1] = g;
+                    dstRow[dstIdx + 2] = r;
+                    dstRow[dstIdx + 3] = 255;
+                }
+            }
+        });
+
+        wb.AddDirtyRect(new System.Windows.Int32Rect(0, 0, width, height));
+        wb.Unlock();
+        wb.Freeze();
+
+        return wb;
+    }
+
     public static BitmapImage LoadThumbnail(string filePath, int decodeWidth = 120)
     {
         var bitmap = new BitmapImage();

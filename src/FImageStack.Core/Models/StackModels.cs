@@ -56,6 +56,7 @@ public sealed class DepthMapResult : IDisposable
 
     /// <summary>
     /// Normalized continuous depth (0.0 = closest / first frame, 1.0 = farthest / last frame)
+    /// Derived from sub-frame parabolic/Gaussian peak fitting on the Focus Volume.
     /// </summary>
     public ImageBuffer<float> DepthMap { get; }
 
@@ -64,6 +65,21 @@ public sealed class DepthMapResult : IDisposable
     /// </summary>
     public ImageBuffer<float> ConfidenceMap { get; }
 
+    /// <summary>
+    /// Depth of field (DOF) thickness estimate at each pixel (FWHM normalized).
+    /// </summary>
+    public ImageBuffer<float> DofMap { get; }
+
+    /// <summary>
+    /// Mask indicating pixels in focus gaps / low texture areas (1.0 = gap, 0.0 = sharp).
+    /// </summary>
+    public ImageBuffer<float> FocusGapMask { get; }
+
+    /// <summary>
+    /// Optional underlying 3D Focus Volume tensor for deep inspection and retouching.
+    /// </summary>
+    public FocusVolume.FocusVolume? FocusVolume { get; set; }
+
     public DepthMapResult(int width, int height)
     {
         Width = width;
@@ -71,6 +87,8 @@ public sealed class DepthMapResult : IDisposable
         SourceFrameMap = new ImageBuffer<int>(width, height, 1, PixelFormatType.GrayFloat32);
         DepthMap = new ImageBuffer<float>(width, height, 1, PixelFormatType.GrayFloat32);
         ConfidenceMap = new ImageBuffer<float>(width, height, 1, PixelFormatType.GrayFloat32);
+        DofMap = new ImageBuffer<float>(width, height, 1, PixelFormatType.GrayFloat32);
+        FocusGapMask = new ImageBuffer<float>(width, height, 1, PixelFormatType.GrayFloat32);
     }
 
     public void Dispose()
@@ -78,6 +96,10 @@ public sealed class DepthMapResult : IDisposable
         SourceFrameMap.Dispose();
         DepthMap.Dispose();
         ConfidenceMap.Dispose();
+        DofMap.Dispose();
+        FocusGapMask.Dispose();
+        FocusVolume?.Dispose();
+        FocusVolume = null;
     }
 }
 
@@ -90,6 +112,9 @@ public sealed class FusionSettings
     public int SmoothingRadius { get; set; } = 2;
     public float ContrastThreshold { get; set; } = 0.001f;
     public bool EnableDepthSmoothing { get; set; } = true;
+    public bool Enable3DRegularization { get; set; } = true;
+    public bool EnableContinuousDepth { get; set; } = true;
+    public bool RetainFocusVolume { get; set; } = true;
     public bool EnableNoiseAwareness { get; set; } = true;
     public bool EnableFocusBreathingCorrection { get; set; } = true;
     public bool EnableQualityAnalysis { get; set; } = false;

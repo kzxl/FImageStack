@@ -28,19 +28,36 @@ public sealed class PixelInspectorInfo : ViewModelBase
     private int _pixelY;
     private int _sourceFrameIndex;
     private string _sourceFrameFileName = string.Empty;
+    private float _subFrameIndex;
     private float _depthZ;
+    private float _dofThickness;
     private float _confidencePercentage;
     private bool _isValidFocus;
     private string _statusBadge = string.Empty;
+    private string _focusCurveSummary = string.Empty;
 
     public int PixelX { get => _pixelX; set => SetProperty(ref _pixelX, value); }
     public int PixelY { get => _pixelY; set => SetProperty(ref _pixelY, value); }
     public int SourceFrameIndex { get => _sourceFrameIndex; set => SetProperty(ref _sourceFrameIndex, value); }
     public string SourceFrameFileName { get => _sourceFrameFileName; set => SetProperty(ref _sourceFrameFileName, value); }
+    public float SubFrameIndex { get => _subFrameIndex; set => SetProperty(ref _subFrameIndex, value); }
     public float DepthZ { get => _depthZ; set => SetProperty(ref _depthZ, value); }
+    public float DofThickness { get => _dofThickness; set => SetProperty(ref _dofThickness, value); }
     public float ConfidencePercentage { get => _confidencePercentage; set => SetProperty(ref _confidencePercentage, value); }
     public bool IsValidFocus { get => _isValidFocus; set => SetProperty(ref _isValidFocus, value); }
     public string StatusBadge { get => _statusBadge; set => SetProperty(ref _statusBadge, value); }
+    public string FocusCurveSummary
+    {
+        get => _focusCurveSummary;
+        set
+        {
+            if (SetProperty(ref _focusCurveSummary, value))
+            {
+                OnPropertyChanged(nameof(HasFocusCurve));
+            }
+        }
+    }
+    public bool HasFocusCurve => !string.IsNullOrEmpty(_focusCurveSummary);
 }
 
 public sealed class ArtifactRegionViewModel : ViewModelBase
@@ -247,6 +264,7 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsMotionTabSelected));
                 OnPropertyChanged(nameof(IsArtifactTabSelected));
                 OnPropertyChanged(nameof(IsSourceTabSelected));
+                OnPropertyChanged(nameof(IsDofVolumeTabSelected));
                 UpdateDisplayBitmap();
             }
         }
@@ -298,6 +316,12 @@ public sealed class MainViewModel : ViewModelBase
     {
         get => SelectedViewTab == 7;
         set { if (value) SelectedViewTab = 7; }
+    }
+
+    public bool IsDofVolumeTabSelected
+    {
+        get => SelectedViewTab == 8;
+        set { if (value) SelectedViewTab = 8; }
     }
 
     public BitmapSource? DisplayBitmap
@@ -582,6 +606,7 @@ public sealed class MainViewModel : ViewModelBase
     public BitmapSource? TurboDepthBitmap { get; private set; }
     public BitmapSource? ConfidenceMapBitmap { get; private set; }
     public BitmapSource? InvalidRegionBitmap { get; private set; }
+    public BitmapSource? DofThicknessBitmap { get; private set; }
     public BitmapSource? MotionMapBitmap { get; private set; }
     public BitmapSource? ArtifactMapBitmap { get; private set; }
 
@@ -858,9 +883,28 @@ public sealed class MainViewModel : ViewModelBase
         int frameIdx = depthRes.SourceFrameMap.DataPointer[idx];
         float depthZ = depthRes.DepthMap.DataPointer[idx];
         float conf = depthRes.ConfidenceMap.DataPointer[idx];
+        float dofVal = depthRes.DofMap != null ? depthRes.DofMap.DataPointer[idx] * Math.Max(1, Frames.Count - 1) : 1.0f;
+        bool isGap = depthRes.FocusGapMask != null && depthRes.FocusGapMask.DataPointer[idx] > 0.5f;
 
+        float subFrame = depthZ * Math.Max(1, Frames.Count - 1);
         string fileName = (frameIdx >= 0 && frameIdx < Frames.Count) ? Frames[frameIdx].FileName : $"Frame #{frameIdx + 1}";
-        bool isValid = conf >= 0.15f;
+        bool isValid = conf >= 0.15f && !isGap;
+
+        string curveSummary = string.Empty;
+        if (depthRes.FocusVolume != null && depthRes.FocusVolume.Width == w && depthRes.FocusVolume.Height == h)
+        {
+            var profileSpan = depthRes.FocusVolume.GetProfile(x, y);
+            var sb = new System.Text.StringBuilder();
+            sb.Append("[");
+            for (int f = 0; f < profileSpan.Length; f++)
+            {
+                sb.Append($"F{f + 1}: {profileSpan[f]:F2}");
+                if (f == frameIdx) sb.Append("★");
+                if (f < profileSpan.Length - 1) sb.Append(" | ");
+            }
+            sb.Append("]");
+            curveSummary = sb.ToString();
+        }
 
         InspectorInfo = new PixelInspectorInfo
         {
@@ -868,10 +912,13 @@ public sealed class MainViewModel : ViewModelBase
             PixelY = y,
             SourceFrameIndex = frameIdx,
             SourceFrameFileName = fileName,
+            SubFrameIndex = subFrame,
             DepthZ = depthZ,
+            DofThickness = dofVal,
             ConfidencePercentage = conf * 100f,
             IsValidFocus = isValid,
-            StatusBadge = isValid ? "✅ In-Focus" : "⚠️ Focus Gap / Bokeh"
+            StatusBadge = isValid ? "✅ In-Focus" : (isGap ? "⚠️ Focus Gap" : "⚠️ Bokeh / Low Texture"),
+            FocusCurveSummary = curveSummary
         };
     }
 
@@ -1163,6 +1210,7 @@ public sealed class MainViewModel : ViewModelBase
             TurboDepthBitmap = BitmapHelper.ToTurboColormapBitmap(result.DepthResult.DepthMap, result.DepthResult.ConfidenceMap);
             ConfidenceMapBitmap = BitmapHelper.ToBitmapSource(result.DepthResult.ConfidenceMap);
             InvalidRegionBitmap = BitmapHelper.ToInvalidRegionBitmap(result.DepthResult.ConfidenceMap);
+            DofThicknessBitmap = BitmapHelper.ToDofThicknessBitmap(result.DepthResult.DofMap, result.DepthResult.ConfidenceMap);
             MotionMapBitmap = BitmapHelper.ToBitmapSource(result.MotionResult?.MotionMap);
             ArtifactMapBitmap = BitmapHelper.ToBitmapSource(result.ArtifactMap?.ArtifactMask);
 
@@ -1313,6 +1361,7 @@ public sealed class MainViewModel : ViewModelBase
             5 => MotionMapBitmap,
             6 => ArtifactMapBitmap,
             7 => SelectedFrame != null && File.Exists(SelectedFrame.FilePath) ? new BitmapImage(new Uri(SelectedFrame.FilePath, UriKind.Absolute)) : null,
+            8 => DofThicknessBitmap,
             _ => FusedBitmap
         };
     }
