@@ -4,6 +4,7 @@
     <Project Path="src/FImageStack.Cli/FImageStack.Cli.csproj" />
     <Project Path="src/FImageStack.Core/FImageStack.Core.csproj" />
     <Project Path="src/FImageStack.Infrastructure/FImageStack.Infrastructure.csproj" />
+    <Project Path="src/FImageStack.UI/FImageStack.UI.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/FImageStack.Core.Tests/FImageStack.Core.Tests.csproj" />
