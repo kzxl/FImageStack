@@ -10,6 +10,7 @@ public interface IProcessingGraphEngine
     void BuildGraph(IReadOnlyList<CoreStackFrame> initialFrames);
     void SetFrameEnabled(int frameIndex, bool enabled);
     void InvalidateNode(string nodeId);
+    void InvalidateStage(ProcessingNodeType stageType);
     GraphExecutionResult Execute(bool forceRecomputeAll = false);
     IReadOnlyDictionary<string, ProcessingNode> Nodes { get; }
 }
@@ -164,6 +165,15 @@ public sealed class ProcessingGraphEngine : IProcessingGraphEngine
                     queue.Enqueue(child);
                 }
             }
+        }
+    }
+
+    public void InvalidateStage(ProcessingNodeType stageType)
+    {
+        var targetNodes = _nodes.Values.Where(n => n.Type == stageType).ToList();
+        foreach (var node in targetNodes)
+        {
+            InvalidateNode(node.Id);
         }
     }
 

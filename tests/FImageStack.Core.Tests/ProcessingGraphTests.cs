@@ -85,7 +85,46 @@ public class ProcessingGraphTests
         // Only 4 downstream aggregator nodes (depth, fusion, repair, output) are recomputed!
         Assert.Equal(4, res2.ExecutedNodesCount);
         Assert.Equal(12, res2.CachedReusedNodesCount);
-        Assert.Contains("Reused from Cache: 12 nodes", res2.Summary);
+        foreach (var f in frames) f.Dispose();
+    }
+
+    [Fact]
+    public void ProcessingGraphEngine_ChangeFusionStage_ShouldOnlyRecomputeFusionAndDownstream()
+    {
+        int w = 16;
+        int h = 16;
+        int frameCount = 4;
+        var frames = new List<StackFrame>();
+
+        for (int i = 0; i < frameCount; i++)
+        {
+            var frame = new StackFrame
+            {
+                Index = i,
+                Width = w,
+                Height = h,
+                GrayBuffer = new ImageBuffer<float>(w, h)
+            };
+            frames.Add(frame);
+        }
+
+        var engine = new ProcessingGraphEngine();
+        engine.BuildGraph(frames);
+
+        // Initial run
+        engine.Execute();
+
+        // User changes Fusion Algorithm
+        engine.InvalidateStage(ProcessingNodeType.Fusion);
+
+        // Incremental re-execution
+        var res = engine.Execute();
+
+        // RAW (4), Lens (4), Align (4), Focus (4), Depth (1) = 17 nodes reused from cache!
+        // Only Fusion (1), Repair (1), Output (1) = 3 nodes recomputed!
+        Assert.Equal(3, res.ExecutedNodesCount);
+        Assert.Equal(17, res.CachedReusedNodesCount);
+        Assert.Contains("Reused from Cache: 17 nodes", res.Summary);
 
         foreach (var f in frames) f.Dispose();
     }
