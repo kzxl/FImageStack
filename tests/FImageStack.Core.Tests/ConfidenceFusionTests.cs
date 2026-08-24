@@ -31,10 +31,10 @@ public class ConfidenceFusionTests
             frames.Add(frame);
         }
 
-        // Frame 1 has highest sharpness
-        frames[0].FocusMap!.AsSpan().Fill(0.2f);
-        frames[1].FocusMap!.AsSpan().Fill(0.9f);
-        frames[2].FocusMap!.AsSpan().Fill(0.4f);
+        // Frame 1 has highest sharpness with continuous optical support from neighbors
+        frames[0].FocusMap!.AsSpan().Fill(0.45f);
+        frames[1].FocusMap!.AsSpan().Fill(0.90f);
+        frames[2].FocusMap!.AsSpan().Fill(0.65f);
 
         var engine = new MultiFactorConfidenceEngine();
         var confMaps = engine.ComputeConfidenceMaps(frames);

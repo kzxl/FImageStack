@@ -11,6 +11,13 @@ public interface IFocusVolumeEngine
 
 public sealed class FocusVolumeEngine : IFocusVolumeEngine
 {
+    private readonly Quality.IMultiFrameConsensusEngine _consensusEngine;
+
+    public FocusVolumeEngine(Quality.IMultiFrameConsensusEngine? consensusEngine = null)
+    {
+        _consensusEngine = consensusEngine ?? new Quality.MultiFrameConsensusEngine();
+    }
+
     public FocusVolume BuildVolume(IReadOnlyList<StackFrame> frames)
     {
         if (frames == null || frames.Count == 0)
@@ -40,6 +47,9 @@ public sealed class FocusVolumeEngine : IFocusVolumeEngine
         bool enable3DSmoothing = true,
         int smoothRadius = 2)
     {
+        // 0. Pre-filter temporal outlier spikes via Multi-Frame Consensus
+        _consensusEngine.ApplyConsensusFilter(volume);
+
         int width = volume.Width;
         int height = volume.Height;
         int frameCount = volume.Slices;

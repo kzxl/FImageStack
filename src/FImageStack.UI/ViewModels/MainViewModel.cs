@@ -923,12 +923,23 @@ public sealed class MainViewModel : ViewModelBase
         string breakdownText = $"Sharpness: {conf:F2} | Conf: {conf * 100f:F0}%";
         if (depthRes.FocusVolume != null)
         {
+            var profileSpan = depthRes.FocusVolume.GetProfile(x, y);
             float s = conf;
             float a = Math.Clamp(1.0f - MathF.Abs(depthZ - (float)frameIdx / Math.Max(1, Frames.Count - 1)), 0.1f, 1.0f);
             float m = _lastResult.MotionResult?.MotionMap != null ? _lastResult.MotionResult.MotionMap.DataPointer[idx] : 0f;
             float e = Math.Clamp(s * 1.1f, 0.2f, 1.0f);
-            float total = s * (0.35f + 0.65f * a) * (0.2f + 0.8f * (1f - Math.Clamp(m * 1.5f, 0f, 0.95f))) * (0.4f + 0.6f * e);
-            breakdownText = $"Sharpness: {s:F2}  |  Alignment: {a:F2}  |  Motion: {m:F2}  |  Edge: {e:F2}  =>  Confidence: {total:F2}";
+
+            float neighborMean = 0f;
+            if (profileSpan.Length >= 3 && frameIdx > 0 && frameIdx < profileSpan.Length - 1)
+            {
+                neighborMean = (profileSpan[frameIdx - 1] + profileSpan[frameIdx + 1]) * 0.5f;
+            }
+            float cons = profileSpan.Length >= 3 && profileSpan[frameIdx] > neighborMean * 1.8f && neighborMean > 0
+                ? Math.Clamp((2f * neighborMean) / (profileSpan[frameIdx] + neighborMean + 1e-5f), 0.05f, 1.0f)
+                : 1.0f;
+
+            float total = s * (0.35f + 0.65f * a) * (0.2f + 0.8f * (1f - Math.Clamp(m * 1.5f, 0f, 0.95f))) * (0.4f + 0.6f * e) * cons;
+            breakdownText = $"S:{s:F2} | A:{a:F2} | M:{m:F2} | E:{e:F2} | Cons:{cons:F2} => Conf:{total:F2}";
         }
 
         InspectorInfo = new PixelInspectorInfo
