@@ -257,16 +257,51 @@
 
                 <!-- Main Image Viewport with Inspector & Retouch Drawing -->
                 <Grid Grid.Row="2">
-                    <!-- 1. Regular Image Viewport -->
-                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                    <!-- 1. Regular Image Viewport with Zoom Scale Transform -->
+                    <ScrollViewer x:Name="ImageScrollViewer"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  VerticalScrollBarVisibility="Auto"
+                                  PreviewMouseWheel="ImageScrollViewer_PreviewMouseWheel"
+                                  PreviewMouseDown="ImageScrollViewer_PreviewMouseDown"
+                                  PreviewMouseMove="ImageScrollViewer_PreviewMouseMove"
+                                  PreviewMouseUp="ImageScrollViewer_PreviewMouseUp">
                         <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10">
+                            <Grid.LayoutTransform>
+                                <ScaleTransform ScaleX="{Binding ZoomScale}" ScaleY="{Binding ZoomScale}" />
+                            </Grid.LayoutTransform>
+
                             <!-- Image Display with Mouse Events for Retouch Painting and Pixel Inspector -->
-                            <Image Source="{Binding DisplayBitmap}" Stretch="None" RenderOptions.BitmapScalingMode="HighQuality"
+                            <Image x:Name="MainDisplayImage"
+                                   Source="{Binding DisplayBitmap}"
+                                   Stretch="None"
+                                   RenderOptions.BitmapScalingMode="HighQuality"
                                    Cursor="Cross"
                                    MouseMove="Image_MouseMove"
                                    MouseDown="Image_MouseDown" />
                         </Grid>
                     </ScrollViewer>
+
+                    <!-- Floating Zoom Controls HUD Toolbar (Top-Right) -->
+                    <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="16"
+                            Background="#DD0F172A" BorderBrush="{StaticResource BorderHover}" BorderThickness="1"
+                            CornerRadius="8" Padding="6,4">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.5" Color="#000000" />
+                        </Border.Effect>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Button Content="➖" Style="{StaticResource ModernButton}" Command="{Binding ZoomOutCommand}" Padding="6,3" FontSize="11" ToolTip="Zoom Out (Ctrl + Wheel Down)" Margin="0,0,3,0" />
+                            <Border Background="#1E293B" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="4" Padding="8,3" Margin="0,0,3,0" VerticalAlignment="Center">
+                                <TextBlock Text="{Binding ZoomScalePercentText}" FontWeight="Bold" FontSize="11" Foreground="#38BDF8" Width="42" TextAlignment="Center" />
+                            </Border>
+                            <Button Content="➕" Style="{StaticResource ModernButton}" Command="{Binding ZoomInCommand}" Padding="6,3" FontSize="11" ToolTip="Zoom In (Ctrl + Wheel Up)" Margin="0,0,4,0" />
+
+                            <Rectangle Width="1" Height="16" Fill="{StaticResource BorderDefault}" Margin="2,0,4,0" />
+
+                            <Button Content="Fit" Style="{StaticResource ModernButton}" Command="{Binding ZoomFitCommand}" Padding="6,3" FontSize="10" FontWeight="SemiBold" ToolTip="Fit Image in Viewport" Margin="0,0,2,0" />
+                            <Button Content="1:1" Style="{StaticResource ModernButton}" Command="{Binding ZoomActualSizeCommand}" Padding="6,3" FontSize="10" FontWeight="Bold" ToolTip="100% Actual Pixel Resolution" Margin="0,0,2,0" />
+                            <Button Content="2:1" Style="{StaticResource ModernButton}" Command="{Binding Zoom200Command}" Padding="6,3" FontSize="10" FontWeight="Bold" ToolTip="200% Pixel Peep Focus" />
+                        </StackPanel>
+                    </Border>
 
                     <!-- 2. Focus Wave Visualizer Panel -->
                     <Border Background="#07090E" Padding="20" Visibility="{Binding IsFocusWaveTabSelected, Converter={StaticResource BoolToVis}}">

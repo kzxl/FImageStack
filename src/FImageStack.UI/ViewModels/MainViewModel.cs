@@ -757,7 +757,30 @@ public sealed class MainViewModel : ViewModelBase
         set { if (value) SelectedSidebarTab = 3; }
     }
 
+    // Zoom & Pan System
+    private double _zoomScale = 1.0;
+    public double ZoomScale
+    {
+        get => _zoomScale;
+        set
+        {
+            double clamped = Math.Clamp(value, 0.1, 10.0);
+            if (SetProperty(ref _zoomScale, clamped))
+            {
+                OnPropertyChanged(nameof(ZoomScalePercentText));
+            }
+        }
+    }
+
+    public string ZoomScalePercentText => $"{(int)Math.Round(ZoomScale * 100)}%";
+
     // Commands
+    public ICommand ZoomInCommand { get; }
+    public ICommand ZoomOutCommand { get; }
+    public ICommand ZoomActualSizeCommand { get; }
+    public ICommand ZoomFitCommand { get; }
+    public ICommand Zoom200Command { get; }
+
     public ICommand LoadFolderCommand { get; }
     public ICommand LoadSampleStackCommand { get; }
     public ICommand SaveProjectCommand { get; }
@@ -889,6 +912,12 @@ public sealed class MainViewModel : ViewModelBase
                 UpdateRetouchStrokesCount();
             }
         });
+
+        ZoomInCommand = new RelayCommand(_ => ZoomScale = Math.Min(10.0, ZoomScale * 1.25));
+        ZoomOutCommand = new RelayCommand(_ => ZoomScale = Math.Max(0.1, ZoomScale / 1.25));
+        ZoomActualSizeCommand = new RelayCommand(_ => ZoomScale = 1.0);
+        ZoomFitCommand = new RelayCommand(_ => ZoomScale = 1.0);
+        Zoom200Command = new RelayCommand(_ => ZoomScale = 2.0);
 
         HuntArtifactsCommand = new AsyncRelayCommand(ExecuteHuntArtifactsAsync, () => !IsProcessing && Frames.Count >= 2);
         CloseHunterPopupCommand = new RelayCommand(_ => IsHunterPopupOpen = false);
