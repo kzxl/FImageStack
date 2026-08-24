@@ -141,6 +141,39 @@
             </Setter>
         </Style>
 
+        <!-- Sidebar Compact Tab Radio Button Style -->
+        <Style x:Key="SidebarTabRadioButton" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{StaticResource TextMuted}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Padding" Value="6,8" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="tabBorder" Background="{TemplateBinding Background}"
+                                BorderThickness="0,0,0,2" BorderBrush="Transparent"
+                                Padding="{TemplateBinding Padding}" CornerRadius="4,4,0,0">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+                                <Setter TargetName="tabBorder" Property="Background" Value="#22273D" />
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter Property="Foreground" Value="#38BDF8" />
+                                <Setter TargetName="tabBorder" Property="BorderBrush" Value="#38BDF8" />
+                                <Setter TargetName="tabBorder" Property="Background" Value="{StaticResource BgCard}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- High-Contrast Dark ComboBoxItem Style -->
         <Style TargetType="ComboBoxItem">
             <Setter Property="SnapsToDevicePixels" Value="True" />

@@ -381,267 +381,297 @@
                 </Grid>
             </Grid>
 
-            <!-- C. Right Sidebar: Settings, Retouch, Post-Processing & Diagnostics -->
+            <!-- C. Right Sidebar: Categorized Tabs + Scrollable Inspector + Pinned Bottom Actions -->
             <Border Grid.Column="2" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1,0,0,0">
-                <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Margin="16">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" /> <!-- Top Sub-Tab Navigation Bar -->
+                        <RowDefinition Height="*" />    <!-- Active Tab Scrollable Content -->
+                        <RowDefinition Height="Auto" /> <!-- Fixed Sticky Action Buttons Dock -->
+                    </Grid.RowDefinitions>
 
-                        <!-- 1. Interactive Retouch & Manual Focus Override Card -->
-                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderHover}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,8">
-                                    <TextBlock Text="🖌️ RETOUCH &amp; MANUAL OVERRIDE" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding StrokesCountText}" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" FontSize="11" VerticalAlignment="Center" />
-                                </Grid>
-
-                                <CheckBox Content="Enable Brush Painting on Canvas" IsChecked="{Binding IsRetouchModeActive}" FontWeight="Bold" Foreground="{StaticResource WarningAccent}" Margin="0,0,0,8" />
-
-                                <Grid Margin="0,0,0,6">
-                                    <TextBlock Text="Tool Mode:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
-                                    <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding ActiveRetouchTool}" Margin="0,18,0,0">
-                                        <ComboBoxItem Content="Source Brush (Override from Frame)" Tag="{x:Static retouch:RetouchToolType.SourceBrush}" IsSelected="True" />
-                                        <ComboBoxItem Content="Restore (Revert to Original Fused)" Tag="{x:Static retouch:RetouchToolType.Restore}" />
-                                    </ComboBox>
-                                </Grid>
-
-                                <Grid Margin="0,0,0,6">
-                                    <TextBlock Text="Source Frame to Paint From:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
-                                    <ComboBox ItemsSource="{Binding Frames}" SelectedIndex="{Binding RetouchSourceFrameIndex}" DisplayMemberPath="FileName" Margin="0,18,0,0" />
-                                </Grid>
-
-                                <Grid Margin="0,4,0,2">
-                                    <TextBlock Text="Brush Size:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
-                                    <TextBlock Text="{Binding BrushRadius, StringFormat='{}{0:F0} px'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
-                                </Grid>
-                                <Slider Minimum="5" Maximum="150" Value="{Binding BrushRadius}" />
-
-                                <Grid Margin="0,2,0,2">
-                                    <TextBlock Text="Brush Feather (Soft Edge):" Foreground="{StaticResource TextSecondary}" FontSize="12" />
-                                    <TextBlock Text="{Binding BrushFeather, StringFormat='{}{0:P0}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
-                                </Grid>
-                                <Slider Minimum="0.0" Maximum="1.0" Value="{Binding BrushFeather}" SmallChange="0.05" />
-
-                                <Grid Margin="0,2,0,2">
-                                    <TextBlock Text="Brush Opacity:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
-                                    <TextBlock Text="{Binding BrushOpacity, StringFormat='{}{0:P0}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
-                                </Grid>
-                                <Slider Minimum="0.1" Maximum="1.0" Value="{Binding BrushOpacity}" SmallChange="0.05" />
-
-                                <!-- Undo / Redo / Clear Controls -->
-                                <Grid Margin="0,8,0,0">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" Content="↩ Undo" Style="{StaticResource ModernButton}" Command="{Binding UndoRetouchCommand}" Margin="0,0,3,0" Padding="6,3" FontSize="11" />
-                                    <Button Grid.Column="1" Content="↪ Redo" Style="{StaticResource ModernButton}" Command="{Binding RedoRetouchCommand}" Margin="3,0,3,0" Padding="6,3" FontSize="11" />
-                                    <Button Grid.Column="2" Content="🗑️ Clear" Style="{StaticResource ModernButton}" Command="{Binding ClearRetouchCommand}" Margin="3,0,0,0" Padding="6,3" FontSize="11" />
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- 2. Preset Profile Card -->
-                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
-                            <StackPanel>
-                                <TextBlock Text="🎯 PRESET PROFILE" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,8" />
-                                <ComboBox ItemsSource="{Binding AvailablePresets}" SelectedItem="{Binding SelectedPreset}" DisplayMemberPath="Name" Margin="0,0,0,6" />
-                                <TextBlock Text="{Binding SelectedPreset.Description}" Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
-                            </StackPanel>
-                        </Border>
-
-                        <!-- 3. Strategy Card -->
-                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
-                            <StackPanel>
-                                <TextBlock Text="⚙️ FUSION STRATEGY" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,10,0" />
-
-                                <TextBlock Text="Fusion Algorithm:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,4" />
-                                <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedMethod}" Margin="0,0,0,10">
-                                    <ComboBoxItem Content="Multi-Scale Laplacian Pyramid" Tag="{x:Static core:FusionMethod.MultiScalePyramid}" IsSelected="True" />
-                                    <ComboBoxItem Content="HDR Focus &amp; Exposure (Mertens Hybrid)" Tag="{x:Static core:FusionMethod.HDRFocusExposure}" />
-                                    <ComboBoxItem Content="2D Wavelet DWT Fusion" Tag="{x:Static core:FusionMethod.WaveletDWT}" />
-                                    <ComboBoxItem Content="Focus-Weighted Continuous Blend" Tag="{x:Static core:FusionMethod.FocusWeighted}" />
-                                    <ComboBoxItem Content="Winner-Takes-All (WTA Fast)" Tag="{x:Static core:FusionMethod.WinnerTakesAll}" />
-                                </ComboBox>
-
-                                <TextBlock Text="Focus Measure Method:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,4" />
-                                <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedFocusMethod}" Margin="0,0,0,10">
-                                    <ComboBoxItem Content="Modified Laplacian (SML Edge)" Tag="{x:Static core:FocusMeasureMethod.ModifiedLaplacian}" IsSelected="True" />
-                                    <ComboBoxItem Content="Tenengrad (Sobel Gradient)" Tag="{x:Static core:FocusMeasureMethod.Tenengrad}" />
-                                    <ComboBoxItem Content="Local Variance (Texture)" Tag="{x:Static core:FocusMeasureMethod.LocalVariance}" />
-                                    <ComboBoxItem Content="2D Wavelet Sharpness" Tag="{x:Static core:FocusMeasureMethod.Wavelet}" />
-                                </ComboBox>
-
-                                <TextBlock Text="Auto Alignment Mode:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,4" />
-                                <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedAlignmentMode}" Margin="0,0,0,10">
-                                    <ComboBoxItem Content="Similarity (Scale + Rot + Trans)" Tag="{x:Static core:AlignmentMode.Similarity}" IsSelected="True" />
-                                    <ComboBoxItem Content="Affine (6-DOF Full Scale/Shear)" Tag="{x:Static core:AlignmentMode.Affine}" />
-                                    <ComboBoxItem Content="Homography (8-DOF Perspective)" Tag="{x:Static core:AlignmentMode.Homography}" />
-                                    <ComboBoxItem Content="Translation Only (Sub-Pixel X/Y)" Tag="{x:Static core:AlignmentMode.TranslationOnly}" />
-                                    <ComboBoxItem Content="None (Locked Tripod)" Tag="{x:Static core:AlignmentMode.None}" />
-                                </ComboBox>
-
-                                <Grid Margin="0,0,0,4">
-                                    <TextBlock Text="Pyramid Decomposition Levels:" Foreground="{StaticResource TextSecondary}" />
-                                    <TextBlock Text="{Binding PyramidLevels}" Foreground="{StaticResource PrimaryAccent}" HorizontalAlignment="Right" FontWeight="Bold" />
-                                </Grid>
-                                <Slider Minimum="3" Maximum="7" Value="{Binding PyramidLevels}" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,0,4,0" />
-                            </StackPanel>
-                        </Border>
-
-                        <!-- 4. Intelligent Diagnostics Card -->
-                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
-                            <StackPanel>
-                                <TextBlock Text="🧠 INTELLIGENT DIAGNOSTICS" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,8,0" />
-
-                                <CheckBox Content="Motion-Aware Ghost Suppression" IsChecked="{Binding EnableMotionSuppression}" ToolTip="Prevents ghosting on leaves and moving insect parts by locking to single sharpest frame" />
-                                <CheckBox Content="Local Elastic Mesh Alignment" IsChecked="{Binding EnableLocalAlignment}" ToolTip="8x8 Tiled sub-pixel motion vector mesh alignment to compensate micro-vibrations and macro 1:1 parallax" />
-                                <CheckBox Content="Edge Discontinuity Reconstruction" IsChecked="{Binding EnableEdgeReconstruction}" ToolTip="Seamlessly reconstructs jagged, sheared or broken contour edges from best source frames" />
-                                <CheckBox Content="Stack Quality &amp; Gap Analyzer" IsChecked="{Binding EnableQualityAnalysis}" ToolTip="Evaluates focus coverage and alerts missing focal planes" />
-                                <CheckBox Content="Artifact Detection &amp; Auto-Repair" IsChecked="{Binding EnableArtifactDetection}" ToolTip="Detects halos/seams and seamlessly patches from best source frames" />
-                                <CheckBox Content="Memory-Bounded Tiled Processing" IsChecked="{Binding EnableTiledProcessing}" ToolTip="Partitions ultra high-res gigapixel sequences (100MP+) into bounded memory tiles" />
-
-                                <StackPanel Visibility="{Binding EnableTiledProcessing, Converter={StaticResource BoolToVis}}" Margin="20,4,0,0">
-                                    <TextBlock Text="Tile Grid Block Size:" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2" />
-                                    <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding TileSize}" Margin="0,0,0,4">
-                                        <ComboBoxItem Content="4096 × 4096 (Gigapixel 100MP+)" Tag="4096" IsSelected="True" />
-                                        <ComboBoxItem Content="2048 × 2048 (Balanced 50MP)" Tag="2048" />
-                                        <ComboBoxItem Content="1024 × 1024 (Low-RAM 16GB)" Tag="1024" />
-                                        <ComboBoxItem Content="512 × 512 (Micro-Bounded 8GB)" Tag="512" />
-                                    </ComboBox>
-                                </StackPanel>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- 5. Hardware & GPU Acceleration Card -->
-                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,8">
-                                    <TextBlock Text="⚡ HARDWARE &amp; GPU ACCELERATION" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
-                                    <Border Background="#1E293B" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="3" Padding="6,1" HorizontalAlignment="Right">
-                                        <TextBlock Text="{Binding GpuStatusBadgeText}" Foreground="#38BDF8" FontWeight="Bold" FontSize="9" />
-                                    </Border>
-                                </Grid>
-
-                                <TextBlock Text="Compute Engine / Accelerator:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,4" />
-                                <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedGpuBackend}" Margin="0,0,0,4">
-                                    <ComboBoxItem Content="Auto (DirectCompute / DirectML Fast)" Tag="{x:Static core:GpuBackendType.Auto}" IsSelected="True" />
-                                    <ComboBoxItem Content="DirectCompute (DirectX 12 Shader)" Tag="{x:Static core:GpuBackendType.DirectCompute}" />
-                                    <ComboBoxItem Content="DirectML (Neural &amp; Tensor Core)" Tag="{x:Static core:GpuBackendType.DirectML}" />
-                                    <ComboBoxItem Content="NVIDIA CUDA Hardware Stream" Tag="{x:Static core:GpuBackendType.Cuda}" />
-                                    <ComboBoxItem Content="CPU Multi-Thread AVX2 SIMD" Tag="{x:Static core:GpuBackendType.CpuSimd}" />
-                                </ComboBox>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- 6. Post-Processing & Clarity Card -->
-                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,8">
-                                    <TextBlock Text="🎨 POST-PROCESSING &amp; CLARITY" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
-                                    <Button Content="Reset" Style="{StaticResource ModernButton}" Command="{Binding ResetPostProcessingCommand}" HorizontalAlignment="Right" Padding="6,2" FontSize="10" />
-                                </Grid>
-
-                                <TextBlock Text="Tone Mapping Curve (HDR &amp; RAW):" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,4" />
-                                <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedToneMapping}" Margin="0,0,0,8">
-                                    <ComboBoxItem Content="ACES Filmic (Cinema &amp; Studio)" Tag="{x:Static core:ToneMappingOperator.ACESFilmic}" IsSelected="True" />
-                                    <ComboBoxItem Content="Reinhard Extended (Smooth Highlights)" Tag="{x:Static core:ToneMappingOperator.ReinhardExtended}" />
-                                    <ComboBoxItem Content="AgX High-Dynamic Curve" Tag="{x:Static core:ToneMappingOperator.AgX}" />
-                                    <ComboBoxItem Content="Linear RAW (Preserve Direct)" Tag="{x:Static core:ToneMappingOperator.LinearPreserve}" />
-                                </ComboBox>
-
-                                <Grid Margin="0,0,0,2">
-                                    <TextBlock Text="Exposure (-2 to +2 EV):" Foreground="{StaticResource TextSecondary}" FontSize="12" />
-                                    <TextBlock Text="{Binding ExposureCompensation, StringFormat='{}{0:F2} EV'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
-                                </Grid>
-                                <Slider Minimum="-2.0" Maximum="2.0" Value="{Binding ExposureCompensation}" SmallChange="0.1" />
-
-                                <Grid Margin="0,0,0,2">
-                                    <TextBlock Text="Contrast:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
-                                    <TextBlock Text="{Binding ContrastAdjustment, StringFormat='{}{0:F2}x'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
-                                </Grid>
-                                <Slider Minimum="0.5" Maximum="2.0" Value="{Binding ContrastAdjustment}" SmallChange="0.05" />
-
-                                <Grid Margin="0,0,0,2">
-                                    <TextBlock Text="Clarity &amp; Micro-Contrast:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
-                                    <TextBlock Text="{Binding ClarityAdjustment, StringFormat='{}{0:F2}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
-                                </Grid>
-                                <Slider Minimum="0.0" Maximum="1.0" Value="{Binding ClarityAdjustment}" SmallChange="0.05" />
-
-                                <Grid Margin="0,0,0,2">
-                                    <TextBlock Text="Unsharp Mask Sharpening:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
-                                    <TextBlock Text="{Binding SharpeningAdjustment, StringFormat='{}{0:F2}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
-                                </Grid>
-                                <Slider Minimum="0.0" Maximum="1.5" Value="{Binding SharpeningAdjustment}" SmallChange="0.05" />
-
-                                <Grid Margin="0,0,0,2">
-                                    <TextBlock Text="Saturation:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
-                                    <TextBlock Text="{Binding SaturationAdjustment, StringFormat='{}{0:F2}x'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
-                                </Grid>
-                                <Slider Minimum="0.0" Maximum="2.0" Value="{Binding SaturationAdjustment}" SmallChange="0.05" />
-                            </StackPanel>
-                        </Border>
-
-                        <!-- 6. Dual-Action Preview & Master Render Buttons -->
-                        <Grid Margin="0,0,0,8">
+                    <!-- 1. Right Sidebar Top Sub-Tab Bar -->
+                    <Border Grid.Row="0" Background="#121524" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="6,4">
+                        <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
-                            </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="⚡ FAST PREVIEW" Style="{StaticResource PrimaryActionButton}" Command="{Binding StartPreviewStackCommand}" Margin="0,0,3,0" Height="44" FontSize="12" FontWeight="Bold" ToolTip="Instant proxy stack (1280px / 0.3s) for fast parameter tuning &amp; retouching" />
-                            <Button Grid.Column="1" Content="🚀 FULL MASTER" Style="{StaticResource ModernButton}" Command="{Binding StartFullMasterRenderCommand}" Margin="3,0,0,0" Height="44" FontSize="12" FontWeight="Bold" Background="#2E1065" BorderBrush="#8B5CF6" Foreground="#E9D5FF" ToolTip="Full 100% native sensor resolution master render for final output" />
-                        </Grid>
-
-                        <Grid Margin="0,0,0,12">
-                            <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <Button Grid.Column="0" Content="🛑 Cancel" Style="{StaticResource ModernButton}" Command="{Binding CancelStackingCommand}" Margin="0,0,4,0" FontWeight="SemiBold" />
-                            <Button Grid.Column="1" Content="💾 Export Image" Style="{StaticResource ModernButton}" Command="{Binding ExportResultCommand}" Margin="4,0,0,0" FontWeight="Bold" />
+                            <RadioButton Grid.Column="0" Content="⚙️ Stack" Style="{StaticResource SidebarTabRadioButton}" IsChecked="{Binding IsSidebarStackTabSelected, Mode=TwoWay}" GroupName="RightSidebarTabs" ToolTip="Stacking Engine, Presets, Algorithms &amp; Hardware" />
+                            <RadioButton Grid.Column="1" Content="🎨 Tone" Style="{StaticResource SidebarTabRadioButton}" IsChecked="{Binding IsSidebarColorTabSelected, Mode=TwoWay}" GroupName="RightSidebarTabs" ToolTip="Color, Clarity, Curves &amp; Histogram" />
+                            <RadioButton Grid.Column="2" Content="🖌️ Retouch" Style="{StaticResource SidebarTabRadioButton}" IsChecked="{Binding IsSidebarRetouchTabSelected, Mode=TwoWay}" GroupName="RightSidebarTabs" ToolTip="Interactive Brush Painting &amp; Manual Override" />
+                            <RadioButton Grid.Column="3" Content="📊 Metrics" Style="{StaticResource SidebarTabRadioButton}" IsChecked="{Binding IsSidebarMetricsTabSelected, Mode=TwoWay}" GroupName="RightSidebarTabs" ToolTip="Quality Scores, Artifacts &amp; Performance" />
                         </Grid>
+                    </Border>
 
-                        <!-- 7. Advanced Quality Analyzer & Artifact Navigator Card -->
-                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
-                            <StackPanel>
-                                <Grid Margin="0,0,0,8">
-                                    <TextBlock Text="📊 QUALITY &amp; ARTIFACT ANALYZER" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
-                                    <TextBlock Text="{Binding QualityScoreText}" Foreground="{StaticResource SuccessAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="13" />
-                                </Grid>
+                    <!-- 2. Active Tab Scrollable Content Area -->
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="12,12,12,6">
+                        <StackPanel>
+                            <!-- Tab 0: Stacking Engine & Presets -->
+                            <StackPanel Visibility="{Binding IsSidebarStackTabSelected, Converter={StaticResource BoolToVis}}">
+                                <!-- 1. Preset Profile Card -->
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="🎯 PRESET PROFILE" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,6" />
+                                        <ComboBox ItemsSource="{Binding AvailablePresets}" SelectedItem="{Binding SelectedPreset}" DisplayMemberPath="Name" Margin="0,0,0,4" />
+                                        <TextBlock Text="{Binding SelectedPreset.Description}" Foreground="{StaticResource TextMuted}" FontSize="11" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </Border>
 
-                                <!-- 6 Multi-Metric Bars -->
-                                <Grid Margin="0,0,0,4">
-                                    <TextBlock Text="Alignment Precision:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
-                                    <TextBlock Text="{Binding MetricAlignmentScore, StringFormat='{}{0:F0}%'}" Foreground="{StaticResource SuccessAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
-                                </Grid>
-                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding MetricAlignmentScore}" Height="5" Foreground="{StaticResource SuccessAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,6" />
+                                <!-- 2. Strategy Card -->
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="⚙️ FUSION STRATEGY" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,8" />
 
-                                <Grid Margin="0,0,0,4">
-                                    <TextBlock Text="Focus Coverage:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
-                                    <TextBlock Text="{Binding MetricFocusCoverageScore, StringFormat='{}{0:F0}%'}" Foreground="{StaticResource PrimaryAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
-                                </Grid>
-                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding MetricFocusCoverageScore}" Height="5" Foreground="{StaticResource PrimaryAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,6" />
+                                        <TextBlock Text="Fusion Algorithm:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,2" FontSize="11" />
+                                        <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedMethod}" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Multi-Scale Laplacian Pyramid" Tag="{x:Static core:FusionMethod.MultiScalePyramid}" IsSelected="True" />
+                                            <ComboBoxItem Content="HDR Focus &amp; Exposure (Mertens Hybrid)" Tag="{x:Static core:FusionMethod.HDRFocusExposure}" />
+                                            <ComboBoxItem Content="2D Wavelet DWT Fusion" Tag="{x:Static core:FusionMethod.WaveletDWT}" />
+                                            <ComboBoxItem Content="Focus-Weighted Continuous Blend" Tag="{x:Static core:FusionMethod.FocusWeighted}" />
+                                            <ComboBoxItem Content="Winner-Takes-All (WTA Fast)" Tag="{x:Static core:FusionMethod.WinnerTakesAll}" />
+                                        </ComboBox>
 
-                                <Grid Margin="0,0,0,4">
-                                    <TextBlock Text="Ghosting Rate:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
-                                    <TextBlock Text="{Binding MetricGhostingPercent, StringFormat='{}{0:F1}%'}" Foreground="{StaticResource DangerAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
-                                </Grid>
-                                <ProgressBar Minimum="0" Maximum="20" Value="{Binding MetricGhostingPercent}" Height="5" Foreground="{StaticResource DangerAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,6" />
+                                        <TextBlock Text="Focus Measure Method:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,2" FontSize="11" />
+                                        <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedFocusMethod}" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Modified Laplacian (SML Edge)" Tag="{x:Static core:FocusMeasureMethod.ModifiedLaplacian}" IsSelected="True" />
+                                            <ComboBoxItem Content="Tenengrad (Sobel Gradient)" Tag="{x:Static core:FocusMeasureMethod.Tenengrad}" />
+                                            <ComboBoxItem Content="Local Variance (Texture)" Tag="{x:Static core:FocusMeasureMethod.LocalVariance}" />
+                                            <ComboBoxItem Content="2D Wavelet Sharpness" Tag="{x:Static core:FocusMeasureMethod.Wavelet}" />
+                                        </ComboBox>
 
-                                <Grid Margin="0,0,0,4">
-                                    <TextBlock Text="Halo Severity:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
-                                    <TextBlock Text="{Binding MetricHaloPercent, StringFormat='{}{0:F1}%'}" Foreground="{StaticResource WarningAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
-                                </Grid>
-                                <ProgressBar Minimum="0" Maximum="20" Value="{Binding MetricHaloPercent}" Height="5" Foreground="{StaticResource WarningAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,6" />
+                                        <TextBlock Text="Auto Alignment Mode:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,2" FontSize="11" />
+                                        <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedAlignmentMode}" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="Similarity (Scale + Rot + Trans)" Tag="{x:Static core:AlignmentMode.Similarity}" IsSelected="True" />
+                                            <ComboBoxItem Content="Affine (6-DOF Full Scale/Shear)" Tag="{x:Static core:AlignmentMode.Affine}" />
+                                            <ComboBoxItem Content="Homography (8-DOF Perspective)" Tag="{x:Static core:AlignmentMode.Homography}" />
+                                            <ComboBoxItem Content="Translation Only (Sub-Pixel X/Y)" Tag="{x:Static core:AlignmentMode.TranslationOnly}" />
+                                            <ComboBoxItem Content="None (Locked Tripod)" Tag="{x:Static core:AlignmentMode.None}" />
+                                        </ComboBox>
 
-                                <Grid Margin="0,0,0,4">
-                                    <TextBlock Text="Edge Quality &amp; Continuity:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
-                                    <TextBlock Text="{Binding MetricEdgeQualityScore, StringFormat='{}{0:F0}%'}" Foreground="{StaticResource SuccessAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
-                                </Grid>
-                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding MetricEdgeQualityScore}" Height="5" Foreground="{StaticResource SuccessAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,8" />
+                                        <Grid Margin="0,0,0,2">
+                                            <TextBlock Text="Pyramid Levels:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding PyramidLevels}" Foreground="{StaticResource PrimaryAccent}" HorizontalAlignment="Right" FontWeight="Bold" FontSize="11" />
+                                        </Grid>
+                                        <Slider Minimum="3" Maximum="7" Value="{Binding PyramidLevels}" IsSnapToTickEnabled="True" TickFrequency="1" Margin="0,0,0,0" />
+                                    </StackPanel>
+                                </Border>
 
-                                <!-- Interactive Detected Artifacts Navigator -->
-                                <Border Background="#121524" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,4,0,0">
+                                <!-- 3. Intelligent Diagnostics Card -->
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="🧠 INTELLIGENT DIAGNOSTICS" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,6" />
+
+                                        <CheckBox Content="Motion-Aware Ghost Suppression" IsChecked="{Binding EnableMotionSuppression}" ToolTip="Prevents ghosting on leaves and moving insect parts by locking to single sharpest frame" FontSize="11" />
+                                        <CheckBox Content="Local Elastic Mesh Alignment" IsChecked="{Binding EnableLocalAlignment}" ToolTip="8x8 Tiled sub-pixel motion vector mesh alignment to compensate micro-vibrations and macro 1:1 parallax" FontSize="11" />
+                                        <CheckBox Content="Edge Discontinuity Reconstruction" IsChecked="{Binding EnableEdgeReconstruction}" ToolTip="Seamlessly reconstructs jagged, sheared or broken contour edges from best source frames" FontSize="11" />
+                                        <CheckBox Content="Stack Quality &amp; Gap Analyzer" IsChecked="{Binding EnableQualityAnalysis}" ToolTip="Evaluates focus coverage and alerts missing focal planes" FontSize="11" />
+                                        <CheckBox Content="Artifact Detection &amp; Auto-Repair" IsChecked="{Binding EnableArtifactDetection}" ToolTip="Detects halos/seams and seamlessly patches from best source frames" FontSize="11" />
+                                        <CheckBox Content="Memory-Bounded Tiled Processing" IsChecked="{Binding EnableTiledProcessing}" ToolTip="Partitions ultra high-res gigapixel sequences (100MP+) into bounded memory tiles" FontSize="11" />
+
+                                        <StackPanel Visibility="{Binding EnableTiledProcessing, Converter={StaticResource BoolToVis}}" Margin="16,4,0,0">
+                                            <TextBlock Text="Tile Grid Block Size:" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2" />
+                                            <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding TileSize}" Margin="0,0,0,4">
+                                                <ComboBoxItem Content="4096 × 4096 (Gigapixel 100MP+)" Tag="4096" IsSelected="True" />
+                                                <ComboBoxItem Content="2048 × 2048 (Balanced 50MP)" Tag="2048" />
+                                                <ComboBoxItem Content="1024 × 1024 (Low-RAM 16GB)" Tag="1024" />
+                                                <ComboBoxItem Content="512 × 512 (Micro-Bounded 8GB)" Tag="512" />
+                                            </ComboBox>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 4. Hardware & GPU Acceleration Card -->
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,6">
+                                            <TextBlock Text="⚡ HARDWARE ACCELERATION" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
+                                            <Border Background="#1E293B" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="3" Padding="6,1" HorizontalAlignment="Right">
+                                                <TextBlock Text="{Binding GpuStatusBadgeText}" Foreground="#38BDF8" FontWeight="Bold" FontSize="9" />
+                                            </Border>
+                                        </Grid>
+
+                                        <TextBlock Text="Compute Engine / Accelerator:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,2" FontSize="11" />
+                                        <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedGpuBackend}" Margin="0,0,0,2">
+                                            <ComboBoxItem Content="Auto (DirectCompute / DirectML Fast)" Tag="{x:Static core:GpuBackendType.Auto}" IsSelected="True" />
+                                            <ComboBoxItem Content="DirectCompute (DirectX 12 Shader)" Tag="{x:Static core:GpuBackendType.DirectCompute}" />
+                                            <ComboBoxItem Content="DirectML (Neural &amp; Tensor Core)" Tag="{x:Static core:GpuBackendType.DirectML}" />
+                                            <ComboBoxItem Content="NVIDIA CUDA Hardware Stream" Tag="{x:Static core:GpuBackendType.Cuda}" />
+                                            <ComboBoxItem Content="CPU Multi-Thread AVX2 SIMD" Tag="{x:Static core:GpuBackendType.CpuSimd}" />
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Tab 1: Color, Clarity, Curves & Live Histogram -->
+                            <StackPanel Visibility="{Binding IsSidebarColorTabSelected, Converter={StaticResource BoolToVis}}">
+                                <!-- 1. Live Dynamic Histogram Card -->
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="📈 LUMINANCE HISTOGRAM" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,6" />
+                                        <Border Background="#0A0C14" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="4" Height="75" ClipToBounds="True" Margin="0,0,0,6">
+                                            <Image Source="{Binding HistogramBitmap}" Stretch="Fill" />
+                                        </Border>
+                                        <Grid>
+                                            <TextBlock Text="{Binding ShadowClippingText, StringFormat='Shadow: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" />
+                                            <TextBlock Text="{Binding HighlightClippingText, StringFormat='Highlight: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" HorizontalAlignment="Right" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 2. Post-Processing & Clarity Card -->
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,6">
+                                            <TextBlock Text="🎨 POST-PROCESSING &amp; CLARITY" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
+                                            <Button Content="Reset" Style="{StaticResource ModernButton}" Command="{Binding ResetPostProcessingCommand}" HorizontalAlignment="Right" Padding="6,2" FontSize="10" />
+                                        </Grid>
+
+                                        <TextBlock Text="Tone Mapping Curve (HDR &amp; RAW):" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" Margin="0,0,0,2" FontSize="11" />
+                                        <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedToneMapping}" Margin="0,0,0,8">
+                                            <ComboBoxItem Content="ACES Filmic (Cinema &amp; Studio)" Tag="{x:Static core:ToneMappingOperator.ACESFilmic}" IsSelected="True" />
+                                            <ComboBoxItem Content="Reinhard Extended (Smooth Highlights)" Tag="{x:Static core:ToneMappingOperator.ReinhardExtended}" />
+                                            <ComboBoxItem Content="AgX High-Dynamic Curve" Tag="{x:Static core:ToneMappingOperator.AgX}" />
+                                            <ComboBoxItem Content="Linear RAW (Preserve Direct)" Tag="{x:Static core:ToneMappingOperator.LinearPreserve}" />
+                                        </ComboBox>
+
+                                        <Grid Margin="0,0,0,1">
+                                            <TextBlock Text="Exposure:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding ExposureCompensation, StringFormat='{}{0:F2} EV'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11" />
+                                        </Grid>
+                                        <Slider Minimum="-2.0" Maximum="2.0" Value="{Binding ExposureCompensation}" SmallChange="0.1" Margin="0,0,0,6" />
+
+                                        <Grid Margin="0,0,0,1">
+                                            <TextBlock Text="Contrast:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding ContrastAdjustment, StringFormat='{}{0:F2}x'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11" />
+                                        </Grid>
+                                        <Slider Minimum="0.5" Maximum="2.0" Value="{Binding ContrastAdjustment}" SmallChange="0.05" Margin="0,0,0,6" />
+
+                                        <Grid Margin="0,0,0,1">
+                                            <TextBlock Text="Clarity &amp; Micro-Contrast:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding ClarityAdjustment, StringFormat='{}{0:F2}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11" />
+                                        </Grid>
+                                        <Slider Minimum="0.0" Maximum="1.0" Value="{Binding ClarityAdjustment}" SmallChange="0.05" Margin="0,0,0,6" />
+
+                                        <Grid Margin="0,0,0,1">
+                                            <TextBlock Text="Unsharp Mask Sharpening:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding SharpeningAdjustment, StringFormat='{}{0:F2}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11" />
+                                        </Grid>
+                                        <Slider Minimum="0.0" Maximum="1.5" Value="{Binding SharpeningAdjustment}" SmallChange="0.05" Margin="0,0,0,6" />
+
+                                        <Grid Margin="0,0,0,1">
+                                            <TextBlock Text="Saturation:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding SaturationAdjustment, StringFormat='{}{0:F2}x'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11" />
+                                        </Grid>
+                                        <Slider Minimum="0.0" Maximum="2.0" Value="{Binding SaturationAdjustment}" SmallChange="0.05" Margin="0,0,0,4" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Tab 2: Retouch & Manual Focus Override -->
+                            <StackPanel Visibility="{Binding IsSidebarRetouchTabSelected, Converter={StaticResource BoolToVis}}">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderHover}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,8">
+                                            <TextBlock Text="🖌️ RETOUCH &amp; MANUAL OVERRIDE" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding StrokesCountText}" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" FontSize="11" VerticalAlignment="Center" />
+                                        </Grid>
+
+                                        <CheckBox Content="Enable Brush Painting on Canvas" IsChecked="{Binding IsRetouchModeActive}" FontWeight="Bold" Foreground="{StaticResource WarningAccent}" Margin="0,0,0,8" FontSize="11" />
+
+                                        <Grid Margin="0,0,0,6">
+                                            <TextBlock Text="Tool Mode:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding ActiveRetouchTool}" Margin="0,18,0,0">
+                                                <ComboBoxItem Content="Source Brush (Override from Frame)" Tag="{x:Static retouch:RetouchToolType.SourceBrush}" IsSelected="True" />
+                                                <ComboBoxItem Content="Restore (Revert to Original Fused)" Tag="{x:Static retouch:RetouchToolType.Restore}" />
+                                            </ComboBox>
+                                        </Grid>
+
+                                        <Grid Margin="0,0,0,6">
+                                            <TextBlock Text="Source Frame to Paint From:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <ComboBox ItemsSource="{Binding Frames}" SelectedIndex="{Binding RetouchSourceFrameIndex}" DisplayMemberPath="FileName" Margin="0,18,0,0" />
+                                        </Grid>
+
+                                        <Grid Margin="0,4,0,1">
+                                            <TextBlock Text="Brush Size:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding BrushRadius, StringFormat='{}{0:F0} px'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11" />
+                                        </Grid>
+                                        <Slider Minimum="5" Maximum="150" Value="{Binding BrushRadius}" Margin="0,0,0,6" />
+
+                                        <Grid Margin="0,2,0,1">
+                                            <TextBlock Text="Brush Feather (Soft Edge):" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding BrushFeather, StringFormat='{}{0:P0}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11" />
+                                        </Grid>
+                                        <Slider Minimum="0.0" Maximum="1.0" Value="{Binding BrushFeather}" SmallChange="0.05" Margin="0,0,0,6" />
+
+                                        <Grid Margin="0,2,0,1">
+                                            <TextBlock Text="Brush Opacity:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding BrushOpacity, StringFormat='{}{0:P0}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11" />
+                                        </Grid>
+                                        <Slider Minimum="0.1" Maximum="1.0" Value="{Binding BrushOpacity}" SmallChange="0.05" Margin="0,0,0,8" />
+
+                                        <!-- Undo / Redo / Clear Controls -->
+                                        <Grid Margin="0,4,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Button Grid.Column="0" Content="↩ Undo" Style="{StaticResource ModernButton}" Command="{Binding UndoRetouchCommand}" Margin="0,0,3,0" Padding="6,4" FontSize="11" />
+                                            <Button Grid.Column="1" Content="↪ Redo" Style="{StaticResource ModernButton}" Command="{Binding RedoRetouchCommand}" Margin="3,0,3,0" Padding="6,4" FontSize="11" />
+                                            <Button Grid.Column="2" Content="🗑️ Clear" Style="{StaticResource ModernButton}" Command="{Binding ClearRetouchCommand}" Margin="3,0,0,0" Padding="6,4" FontSize="11" />
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Tab 3: Quality Metrics & Artifact Navigator -->
+                            <StackPanel Visibility="{Binding IsSidebarMetricsTabSelected, Converter={StaticResource BoolToVis}}">
+                                <!-- 1. Advanced Quality Analyzer Card -->
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,8">
+                                            <TextBlock Text="📊 QUALITY ANALYZER" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
+                                            <TextBlock Text="{Binding QualityScoreText}" Foreground="{StaticResource SuccessAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="12" />
+                                        </Grid>
+
+                                        <!-- 5 Multi-Metric Bars -->
+                                        <Grid Margin="0,0,0,2">
+                                            <TextBlock Text="Alignment Precision:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding MetricAlignmentScore, StringFormat='{}{0:F0}%'}" Foreground="{StaticResource SuccessAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
+                                        </Grid>
+                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding MetricAlignmentScore}" Height="5" Foreground="{StaticResource SuccessAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,6" />
+
+                                        <Grid Margin="0,0,0,2">
+                                            <TextBlock Text="Focus Coverage:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding MetricFocusCoverageScore, StringFormat='{}{0:F0}%'}" Foreground="{StaticResource PrimaryAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
+                                        </Grid>
+                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding MetricFocusCoverageScore}" Height="5" Foreground="{StaticResource PrimaryAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,6" />
+
+                                        <Grid Margin="0,0,0,2">
+                                            <TextBlock Text="Ghosting Rate:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding MetricGhostingPercent, StringFormat='{}{0:F1}%'}" Foreground="{StaticResource DangerAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
+                                        </Grid>
+                                        <ProgressBar Minimum="0" Maximum="20" Value="{Binding MetricGhostingPercent}" Height="5" Foreground="{StaticResource DangerAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,6" />
+
+                                        <Grid Margin="0,0,0,2">
+                                            <TextBlock Text="Halo Severity:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding MetricHaloPercent, StringFormat='{}{0:F1}%'}" Foreground="{StaticResource WarningAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
+                                        </Grid>
+                                        <ProgressBar Minimum="0" Maximum="20" Value="{Binding MetricHaloPercent}" Height="5" Foreground="{StaticResource WarningAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,6" />
+
+                                        <Grid Margin="0,0,0,2">
+                                            <TextBlock Text="Edge Quality:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                            <TextBlock Text="{Binding MetricEdgeQualityScore, StringFormat='{}{0:F0}%'}" Foreground="{StaticResource SuccessAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
+                                        </Grid>
+                                        <ProgressBar Minimum="0" Maximum="100" Value="{Binding MetricEdgeQualityScore}" Height="5" Foreground="{StaticResource SuccessAccent}" Background="#1E2337" BorderThickness="0" Margin="0,0,0,4" />
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 2. Interactive Detected Artifacts Navigator -->
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                                     <StackPanel>
                                         <TextBlock Text="🚨 DETECTED ARTIFACT REGIONS" FontWeight="Bold" FontSize="11" Foreground="{StaticResource WarningAccent}" Margin="0,0,0,6" />
                                         <ItemsControl ItemsSource="{Binding DetectedArtifactRegions}">
@@ -665,29 +695,41 @@
                                     </StackPanel>
                                 </Border>
 
-                                <Grid Margin="0,8,0,0">
-                                    <TextBlock Text="{Binding TimingText, StringFormat='Speed: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" />
-                                    <TextBlock Text="{Binding MemoryUsageText, StringFormat='RAM: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" HorizontalAlignment="Right" />
-                                </Grid>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- 8. Live Dynamic Histogram Card -->
-                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14">
-                            <StackPanel>
-                                <TextBlock Text="📈 LUMINANCE HISTOGRAM" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,8,0" />
-                                <Border Background="#0A0C14" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="4" Height="80" ClipToBounds="True" Margin="0,0,0,6">
-                                    <Image Source="{Binding HistogramBitmap}" Stretch="Fill" />
+                                <!-- 3. Speed & RAM Info Card -->
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6">
+                                    <Grid>
+                                        <TextBlock Text="{Binding TimingText, StringFormat='Speed: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" />
+                                        <TextBlock Text="{Binding MemoryUsageText, StringFormat='RAM: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" HorizontalAlignment="Right" />
+                                    </Grid>
                                 </Border>
-                                <Grid>
-                                    <TextBlock Text="{Binding ShadowClippingText, StringFormat='Shadow Clip: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" />
-                                    <TextBlock Text="{Binding HighlightClippingText, StringFormat='Highlight Clip: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" HorizontalAlignment="Right" />
-                                </Grid>
                             </StackPanel>
-                        </Border>
+                        </StackPanel>
+                    </ScrollViewer>
 
-                    </StackPanel>
-                </ScrollViewer>
+                    <!-- 3. Bottom Pinned Sticky Action Dock (Always Visible) -->
+                    <Border Grid.Row="2" Background="#121524" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,1,0,0" Padding="12,10">
+                        <StackPanel>
+                            <!-- Dual-Action Preview & Master Render Buttons -->
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Content="⚡ FAST PREVIEW" Style="{StaticResource PrimaryActionButton}" Command="{Binding StartPreviewStackCommand}" Margin="0,0,3,0" Height="40" FontSize="12" FontWeight="Bold" ToolTip="Instant proxy stack (1280px / 0.3s) for fast parameter tuning &amp; retouching" />
+                                <Button Grid.Column="1" Content="🚀 FULL MASTER" Style="{StaticResource ModernButton}" Command="{Binding StartFullMasterRenderCommand}" Margin="3,0,0,0" Height="40" FontSize="12" FontWeight="Bold" Background="#2E1065" BorderBrush="#8B5CF6" Foreground="#E9D5FF" ToolTip="Full 100% native sensor resolution master render for final output" />
+                            </Grid>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0" Content="🛑 Cancel" Style="{StaticResource ModernButton}" Command="{Binding CancelStackingCommand}" Margin="0,0,3,0" Padding="8,5" FontWeight="SemiBold" FontSize="11" />
+                                <Button Grid.Column="1" Content="💾 Export Image" Style="{StaticResource ModernButton}" Command="{Binding ExportResultCommand}" Margin="3,0,0,0" Padding="8,5" FontWeight="Bold" FontSize="11" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </Grid>
             </Border>
         </Grid>
 

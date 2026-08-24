@@ -716,6 +716,47 @@ public sealed class MainViewModel : ViewModelBase
     private string _labSummaryText = "Click 'Run Lab' to benchmark all 5 stacking algorithms simultaneously.";
     public string LabSummaryText { get => _labSummaryText; set => SetProperty(ref _labSummaryText, value); }
 
+    // Right Sidebar Active Tab: 0=Stacking Engine, 1=Color/Post, 2=Retouch, 3=Quality/Metrics
+    private int _selectedSidebarTab = 0;
+    public int SelectedSidebarTab
+    {
+        get => _selectedSidebarTab;
+        set
+        {
+            if (SetProperty(ref _selectedSidebarTab, value))
+            {
+                OnPropertyChanged(nameof(IsSidebarStackTabSelected));
+                OnPropertyChanged(nameof(IsSidebarColorTabSelected));
+                OnPropertyChanged(nameof(IsSidebarRetouchTabSelected));
+                OnPropertyChanged(nameof(IsSidebarMetricsTabSelected));
+            }
+        }
+    }
+
+    public bool IsSidebarStackTabSelected
+    {
+        get => _selectedSidebarTab == 0;
+        set { if (value) SelectedSidebarTab = 0; }
+    }
+
+    public bool IsSidebarColorTabSelected
+    {
+        get => _selectedSidebarTab == 1;
+        set { if (value) SelectedSidebarTab = 1; }
+    }
+
+    public bool IsSidebarRetouchTabSelected
+    {
+        get => _selectedSidebarTab == 2;
+        set { if (value) SelectedSidebarTab = 2; }
+    }
+
+    public bool IsSidebarMetricsTabSelected
+    {
+        get => _selectedSidebarTab == 3;
+        set { if (value) SelectedSidebarTab = 3; }
+    }
+
     // Commands
     public ICommand LoadFolderCommand { get; }
     public ICommand LoadSampleStackCommand { get; }
