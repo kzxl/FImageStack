@@ -45,7 +45,7 @@ public sealed class StandardDepthMapEstimator : IDepthMapEstimator
 
                 for (int f = 0; f < frameCount; f++)
                 {
-                    float val = focusPointers[f][pixelIdx];
+                    float val = focusPointers[f][pixelIdx] * frames[f].PriorityWeight;
                     sumVal += val;
                     if (val > maxVal)
                     {

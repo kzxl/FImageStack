@@ -15,25 +15,35 @@ public partial class MainWindow : Window
 
     private void Image_MouseMove(object sender, MouseEventArgs e)
     {
-        UpdateInspectorCoordinates(sender, e);
+        HandleImageInteraction(sender, e, isClick: false);
     }
 
     private void Image_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        UpdateInspectorCoordinates(sender, e);
+        if (e.LeftButton == MouseButtonState.Pressed)
+        {
+            HandleImageInteraction(sender, e, isClick: true);
+        }
     }
 
-    private void UpdateInspectorCoordinates(object sender, MouseEventArgs e)
+    private void HandleImageInteraction(object sender, MouseEventArgs e, bool isClick)
     {
         if (DataContext is MainViewModel vm && sender is Image img && img.Source is BitmapSource bs)
         {
             if (img.ActualWidth <= 0 || img.ActualHeight <= 0) return;
 
             var pos = e.GetPosition(img);
-            int pixelX = (int)(pos.X * (bs.PixelWidth / img.ActualWidth));
-            int pixelY = (int)(pos.Y * (bs.PixelHeight / img.ActualHeight));
+            float pixelX = (float)(pos.X * (bs.PixelWidth / img.ActualWidth));
+            float pixelY = (float)(pos.Y * (bs.PixelHeight / img.ActualHeight));
 
-            vm.InspectPixel(pixelX, pixelY);
+            // Inspector HUD coordinates
+            vm.InspectPixel((int)pixelX, (int)pixelY);
+
+            // Manual Focus Override Painting
+            if (vm.IsRetouchModeActive && (isClick || e.LeftButton == MouseButtonState.Pressed))
+            {
+                vm.ApplyBrushStroke(pixelX, pixelY);
+            }
         }
     }
 }

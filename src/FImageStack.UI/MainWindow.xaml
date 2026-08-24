@@ -3,8 +3,9 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="clr-namespace:FImageStack.UI.ViewModels"
         xmlns:core="clr-namespace:FImageStack.Core;assembly=FImageStack.Core"
+        xmlns:retouch="clr-namespace:FImageStack.Core.Retouch;assembly=FImageStack.Core"
         Title="FImageStack Pro — Intelligent Focus Fusion Engine"
-        Height="900" Width="1450"
+        Height="950" Width="1480"
         MinHeight="700" MinWidth="1100"
         WindowStartupLocation="CenterScreen">
 
@@ -59,12 +60,12 @@
         <!-- 2. Main Work Area -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="290" MinWidth="230" MaxWidth="420" /> <!-- Left: Frames List -->
-                <ColumnDefinition Width="*" />                                    <!-- Center: Image Canvas -->
-                <ColumnDefinition Width="380" MinWidth="320" MaxWidth="480" /> <!-- Right: Config, Post-Process & Diagnostics -->
+                <ColumnDefinition Width="310" MinWidth="250" MaxWidth="440" /> <!-- Left: Frames List with Priority Weights -->
+                <ColumnDefinition Width="*" />                                    <!-- Center: Image Canvas with HUD -->
+                <ColumnDefinition Width="390" MinWidth="320" MaxWidth="500" /> <!-- Right: Config, Retouch & Diagnostics -->
             </Grid.ColumnDefinitions>
 
-            <!-- A. Left Sidebar: Frame List -->
+            <!-- A. Left Sidebar: Frame List & Priority Weights -->
             <Border Grid.Column="0" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,1,0">
                 <Grid>
                     <Grid.RowDefinitions>
@@ -127,7 +128,10 @@
 
                                     <StackPanel Grid.Column="2" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" FontSize="12" />
-                                        <TextBlock Text="{Binding Index, StringFormat='Frame #{0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" Margin="0,2,0,0" />
+                                        <Grid Margin="0,2,0,0">
+                                            <TextBlock Text="{Binding Index, StringFormat='Frame #{0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" />
+                                            <TextBlock Text="{Binding PriorityWeight, StringFormat='Weight: {0:F1}x'}" Foreground="{StaticResource PrimaryAccent}" FontSize="11" HorizontalAlignment="Right" FontWeight="Medium" />
+                                        </Grid>
                                     </StackPanel>
                                 </Grid>
                             </DataTemplate>
@@ -175,11 +179,11 @@
                     </Grid>
                 </Border>
 
-                <!-- Main Image Viewport with Inspector Overlay -->
+                <!-- Main Image Viewport with Inspector & Retouch Drawing -->
                 <Grid Grid.Row="2">
                     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                         <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10">
-                            <!-- Image Display with Mouse Events for Pixel Inspector -->
+                            <!-- Image Display with Mouse Events for Retouch Painting and Pixel Inspector -->
                             <Image Source="{Binding DisplayBitmap}" Stretch="None" RenderOptions.BitmapScalingMode="HighQuality"
                                    Cursor="Cross"
                                    MouseMove="Image_MouseMove"
@@ -209,12 +213,67 @@
                 </Grid>
             </Grid>
 
-            <!-- C. Right Sidebar: Settings, Post-Processing, Diagnostics & Metrics -->
+            <!-- C. Right Sidebar: Settings, Retouch, Post-Processing & Diagnostics -->
             <Border Grid.Column="2" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1,0,0,0">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="16">
 
-                        <!-- 1. Preset Profile Card -->
+                        <!-- 1. Interactive Retouch & Manual Focus Override Card -->
+                        <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderHover}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
+                            <StackPanel>
+                                <Grid Margin="0,0,0,8">
+                                    <TextBlock Text="🖌️ RETOUCH &amp; MANUAL OVERRIDE" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding StrokesCountText}" Foreground="{StaticResource TextMuted}" HorizontalAlignment="Right" FontSize="11" VerticalAlignment="Center" />
+                                </Grid>
+
+                                <CheckBox Content="Enable Brush Painting on Canvas" IsChecked="{Binding IsRetouchModeActive}" FontWeight="Bold" Foreground="{StaticResource WarningAccent}" Margin="0,0,0,8" />
+
+                                <Grid Margin="0,0,0,6">
+                                    <TextBlock Text="Tool Mode:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
+                                    <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding ActiveRetouchTool}" Margin="0,18,0,0">
+                                        <ComboBoxItem Content="Source Brush (Override from Frame)" Tag="{x:Static retouch:RetouchToolType.SourceBrush}" IsSelected="True" />
+                                        <ComboBoxItem Content="Restore (Revert to Original Fused)" Tag="{x:Static retouch:RetouchToolType.Restore}" />
+                                    </ComboBox>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,6">
+                                    <TextBlock Text="Source Frame to Paint From:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
+                                    <ComboBox ItemsSource="{Binding Frames}" SelectedIndex="{Binding RetouchSourceFrameIndex}" DisplayMemberPath="FileName" Margin="0,18,0,0" />
+                                </Grid>
+
+                                <Grid Margin="0,4,0,2">
+                                    <TextBlock Text="Brush Size:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
+                                    <TextBlock Text="{Binding BrushRadius, StringFormat='{}{0:F0} px'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
+                                </Grid>
+                                <Slider Minimum="5" Maximum="150" Value="{Binding BrushRadius}" />
+
+                                <Grid Margin="0,2,0,2">
+                                    <TextBlock Text="Brush Feather (Soft Edge):" Foreground="{StaticResource TextSecondary}" FontSize="12" />
+                                    <TextBlock Text="{Binding BrushFeather, StringFormat='{}{0:P0}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
+                                </Grid>
+                                <Slider Minimum="0.0" Maximum="1.0" Value="{Binding BrushFeather}" SmallChange="0.05" />
+
+                                <Grid Margin="0,2,0,2">
+                                    <TextBlock Text="Brush Opacity:" Foreground="{StaticResource TextSecondary}" FontSize="12" />
+                                    <TextBlock Text="{Binding BrushOpacity, StringFormat='{}{0:P0}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="12" />
+                                </Grid>
+                                <Slider Minimum="0.1" Maximum="1.0" Value="{Binding BrushOpacity}" SmallChange="0.05" />
+
+                                <!-- Undo / Redo / Clear Controls -->
+                                <Grid Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Content="↩ Undo" Style="{StaticResource ModernButton}" Command="{Binding UndoRetouchCommand}" Margin="0,0,3,0" Padding="6,3" FontSize="11" />
+                                    <Button Grid.Column="1" Content="↪ Redo" Style="{StaticResource ModernButton}" Command="{Binding RedoRetouchCommand}" Margin="3,0,3,0" Padding="6,3" FontSize="11" />
+                                    <Button Grid.Column="2" Content="🗑️ Clear" Style="{StaticResource ModernButton}" Command="{Binding ClearRetouchCommand}" Margin="3,0,0,0" Padding="6,3" FontSize="11" />
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- 2. Preset Profile Card -->
                         <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="🎯 PRESET PROFILE" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,8" />
@@ -223,7 +282,7 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 2. Strategy Card -->
+                        <!-- 3. Strategy Card -->
                         <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="⚙️ FUSION STRATEGY" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,10,0" />
@@ -261,7 +320,7 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 3. Intelligent Diagnostics Card -->
+                        <!-- 4. Intelligent Diagnostics Card -->
                         <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="🧠 INTELLIGENT DIAGNOSTICS" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,8,0" />
@@ -273,7 +332,7 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 4. Post-Processing & Clarity Card -->
+                        <!-- 5. Post-Processing & Clarity Card -->
                         <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                             <StackPanel>
                                 <Grid Margin="0,0,0,8">
@@ -313,7 +372,7 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 5. Primary Action Buttons -->
+                        <!-- 6. Primary Action Buttons -->
                         <Button Content="▶  START FOCUS STACKING" Style="{StaticResource PrimaryActionButton}" Command="{Binding StartStackingCommand}" Margin="0,0,0,8" Height="44" FontSize="14" />
                         <Grid Margin="0,0,0,12">
                             <Grid.ColumnDefinitions>
@@ -324,7 +383,7 @@
                             <Button Grid.Column="1" Content="💾 Export Image" Style="{StaticResource ModernButton}" Command="{Binding ExportResultCommand}" Margin="4,0,0,0" FontWeight="Bold" />
                         </Grid>
 
-                        <!-- 6. Quality & Performance Card -->
+                        <!-- 7. Quality & Performance Card -->
                         <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14" Margin="0,0,0,12">
                             <StackPanel>
                                 <TextBlock Text="📊 QUALITY &amp; PERFORMANCE" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,10,0" />
@@ -352,7 +411,7 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- 7. Live Dynamic Histogram Card -->
+                        <!-- 8. Live Dynamic Histogram Card -->
                         <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="14">
                             <StackPanel>
                                 <TextBlock Text="📈 LUMINANCE HISTOGRAM" FontWeight="Bold" FontSize="12" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,8,0" />

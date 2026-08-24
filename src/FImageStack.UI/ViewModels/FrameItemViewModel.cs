@@ -11,11 +11,18 @@ public sealed class FrameItemViewModel : ViewModelBase
     private BitmapImage? _thumbnail;
     private double _sharpnessScore;
     private bool _isExcluded;
+    private float _priorityWeight = 1.0f;
 
     public int Index { get; }
     public string FilePath { get; }
     public string FileName => Path.GetFileName(FilePath);
     public string DirectoryPath => Path.GetDirectoryName(FilePath) ?? "";
+
+    public float PriorityWeight
+    {
+        get => _priorityWeight;
+        set => SetProperty(ref _priorityWeight, value);
+    }
 
     public bool IsSelected
     {

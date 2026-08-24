@@ -10,6 +10,7 @@ using FImageStack.Core.Models;
 using FImageStack.Core.PostProcessing;
 using FImageStack.Core.Presets;
 using FImageStack.Core.Quality;
+using FImageStack.Core.Retouch;
 using FImageStack.Infrastructure.IO;
 using FImageStack.UI.Common;
 using FImageStack.UI.Utils;
@@ -48,6 +49,7 @@ public sealed class MainViewModel : ViewModelBase
     private CancellationTokenSource? _cts;
     private ProcessedStackResult? _lastResult;
     private ImageBuffer<float>? _postProcessedBuffer;
+    private RetouchLayer? _retouchLayer;
 
     private bool _isProcessing;
     private double _progressPercentage;
@@ -78,6 +80,15 @@ public sealed class MainViewModel : ViewModelBase
 
     // Split Comparison
     private double _splitRatio = 0.5;
+
+    // Retouch & Manual Focus Override
+    private bool _isRetouchModeActive;
+    private RetouchToolType _activeRetouchTool = RetouchToolType.SourceBrush;
+    private int _retouchSourceFrameIndex = 0;
+    private float _brushRadius = 35.0f;
+    private float _brushFeather = 0.5f;
+    private float _brushOpacity = 1.0f;
+    private string _strokesCountText = "0 strokes";
 
     // Pixel Inspector
     private PixelInspectorInfo? _inspectorInfo;
@@ -214,6 +225,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedFrame, value))
             {
+                if (value != null) RetouchSourceFrameIndex = value.Index;
                 if (SelectedViewTab == 7 || SelectedViewTab == 1)
                 {
                     UpdateDisplayBitmap();
@@ -244,6 +256,49 @@ public sealed class MainViewModel : ViewModelBase
                 if (SelectedViewTab == 1) UpdateDisplayBitmap();
             }
         }
+    }
+
+    // Retouch Properties
+    public bool IsRetouchModeActive
+    {
+        get => _isRetouchModeActive;
+        set => SetProperty(ref _isRetouchModeActive, value);
+    }
+
+    public RetouchToolType ActiveRetouchTool
+    {
+        get => _activeRetouchTool;
+        set => SetProperty(ref _activeRetouchTool, value);
+    }
+
+    public int RetouchSourceFrameIndex
+    {
+        get => _retouchSourceFrameIndex;
+        set => SetProperty(ref _retouchSourceFrameIndex, value);
+    }
+
+    public float BrushRadius
+    {
+        get => _brushRadius;
+        set => SetProperty(ref _brushRadius, value);
+    }
+
+    public float BrushFeather
+    {
+        get => _brushFeather;
+        set => SetProperty(ref _brushFeather, value);
+    }
+
+    public float BrushOpacity
+    {
+        get => _brushOpacity;
+        set => SetProperty(ref _brushOpacity, value);
+    }
+
+    public string StrokesCountText
+    {
+        get => _strokesCountText;
+        set => SetProperty(ref _strokesCountText, value);
     }
 
     public PixelInspectorInfo? InspectorInfo
@@ -431,6 +486,9 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand SelectAllFramesCommand { get; }
     public ICommand ResetPostProcessingCommand { get; }
     public ICommand JumpToInspectedFrameCommand { get; }
+    public ICommand UndoRetouchCommand { get; }
+    public ICommand RedoRetouchCommand { get; }
+    public ICommand ClearRetouchCommand { get; }
 
     public MainViewModel()
     {
@@ -474,12 +532,117 @@ public sealed class MainViewModel : ViewModelBase
             }
         });
 
+        UndoRetouchCommand = new RelayCommand(_ =>
+        {
+            if (_retouchLayer != null && _retouchLayer.Undo())
+            {
+                ApplyLivePostProcessing();
+                UpdateRetouchStrokesCount();
+            }
+        });
+
+        RedoRetouchCommand = new RelayCommand(_ =>
+        {
+            if (_retouchLayer != null && _retouchLayer.Redo())
+            {
+                ApplyLivePostProcessing();
+                UpdateRetouchStrokesCount();
+            }
+        });
+
+        ClearRetouchCommand = new RelayCommand(_ =>
+        {
+            if (_retouchLayer != null && _retouchLayer.Strokes.Count > 0)
+            {
+                _retouchLayer.Strokes.Clear();
+                ApplyLivePostProcessing();
+                UpdateRetouchStrokesCount();
+            }
+        });
+
         // Try pre-loading test dataset if available
         string defaultSample = @"data\test_stack_50";
         if (Directory.Exists(defaultSample))
         {
             LoadFolder(defaultSample);
         }
+    }
+
+    public unsafe void ApplyBrushStroke(float x, float y)
+    {
+        if (_lastResult == null || _retouchLayer == null) return;
+        if (RetouchSourceFrameIndex < 0 || RetouchSourceFrameIndex >= Frames.Count) return;
+
+        var stroke = new RetouchStroke
+        {
+            StrokeId = _retouchLayer.Strokes.Count + 1,
+            Tool = ActiveRetouchTool,
+            SourceFrameIndex = RetouchSourceFrameIndex,
+            CenterX = x,
+            CenterY = y,
+            Radius = BrushRadius,
+            Feather = BrushFeather,
+            Opacity = BrushOpacity
+        };
+
+        _retouchLayer.AddStroke(stroke);
+        UpdateRetouchStrokesCount();
+
+        // Real-time incremental patch on current post-processed buffer
+        if (_postProcessedBuffer != null && File.Exists(Frames[RetouchSourceFrameIndex].FilePath))
+        {
+            using var srcFrame = _imageIO.LoadFrame(Frames[RetouchSourceFrameIndex].FilePath, RetouchSourceFrameIndex);
+            int w = _postProcessedBuffer.Width;
+            int h = _postProcessedBuffer.Height;
+
+            int x0 = Math.Max(0, (int)(x - BrushRadius));
+            int y0 = Math.Max(0, (int)(y - BrushRadius));
+            int x1 = Math.Min(w, (int)(x + BrushRadius + 1));
+            int y1 = Math.Min(h, (int)(y + BrushRadius + 1));
+
+            float rSq = BrushRadius * BrushRadius;
+            float innerRadius = BrushRadius * (1f - BrushFeather);
+            float innerSq = innerRadius * innerRadius;
+
+            float* dstPtr = _postProcessedBuffer.DataPointer;
+            float* srcPtr = srcFrame.ColorBuffer!.DataPointer;
+
+            Parallel.For(y0, y1, py =>
+            {
+                int rowOffset = py * w;
+                float dy = py - y;
+                float dySq = dy * dy;
+
+                for (int px = x0; px < x1; px++)
+                {
+                    float dx = px - x;
+                    float distSq = dx * dx + dySq;
+                    if (distSq > rSq) continue;
+
+                    float weight = BrushOpacity;
+                    if (distSq > innerSq && BrushFeather > 0)
+                    {
+                        float dist = MathF.Sqrt(distSq);
+                        float featherT = (dist - innerRadius) / (BrushRadius - innerRadius + 1e-5f);
+                        weight *= 0.5f * (1.0f + MathF.Cos(featherT * MathF.PI));
+                    }
+
+                    int idx = (rowOffset + px) * 3;
+                    dstPtr[idx] = dstPtr[idx] * (1f - weight) + srcPtr[idx] * weight;
+                    dstPtr[idx + 1] = dstPtr[idx + 1] * (1f - weight) + srcPtr[idx + 1] * weight;
+                    dstPtr[idx + 2] = dstPtr[idx + 2] * (1f - weight) + srcPtr[idx + 2] * weight;
+                }
+            });
+
+            FusedBitmap = BitmapHelper.ToBitmapSource(_postProcessedBuffer);
+            if (SelectedViewTab == 0) DisplayBitmap = FusedBitmap;
+        }
+    }
+
+    private void UpdateRetouchStrokesCount()
+    {
+        int count = _retouchLayer?.Strokes.Count ?? 0;
+        StrokesCountText = $"{count} stroke{(count != 1 ? "s" : "")}";
     }
 
     public unsafe void InspectPixel(int x, int y)
@@ -619,9 +782,12 @@ public sealed class MainViewModel : ViewModelBase
             _lastResult?.Dispose();
             _postProcessedBuffer?.Dispose();
             _postProcessedBuffer = null;
+            _retouchLayer?.Dispose();
 
             var result = await _stackService.ProcessStackAsync(activeFiles, settings, progress, _cts.Token);
             _lastResult = result;
+            _retouchLayer = new RetouchLayer(result.FusedImage.Width, result.FusedImage.Height);
+            UpdateRetouchStrokesCount();
 
             // Generate Bitmaps
             ApplyLivePostProcessing();
