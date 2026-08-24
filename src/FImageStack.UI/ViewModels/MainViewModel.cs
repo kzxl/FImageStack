@@ -79,6 +79,7 @@ public sealed class MainViewModel : ViewModelBase
     private bool _enableArtifactDetection = true;
     private bool _enableAutoRepair = true;
     private bool _enableLocalAlignment = true;
+    private bool _enableEdgeReconstruction = true;
     private bool _enableTiledProcessing = false;
     private int _tileSize = 512;
 
@@ -416,6 +417,12 @@ public sealed class MainViewModel : ViewModelBase
     {
         get => _enableLocalAlignment;
         set => SetProperty(ref _enableLocalAlignment, value);
+    }
+
+    public bool EnableEdgeReconstruction
+    {
+        get => _enableEdgeReconstruction;
+        set => SetProperty(ref _enableEdgeReconstruction, value);
     }
 
     public bool EnableTiledProcessing
@@ -840,6 +847,7 @@ public sealed class MainViewModel : ViewModelBase
             EnableArtifactDetection = EnableArtifactDetection,
             EnableAutoRepair = EnableAutoRepair,
             EnableLocalAlignment = EnableLocalAlignment,
+            EnableEdgeReconstruction = EnableEdgeReconstruction,
             EnableTiledProcessing = EnableTiledProcessing,
             TileSize = TileSize
         };

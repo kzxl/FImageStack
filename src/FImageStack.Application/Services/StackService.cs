@@ -74,6 +74,7 @@ public sealed class StackService : IStackService
     private readonly IStackQualityAnalyzer _qualityAnalyzer;
     private readonly IArtifactDetector _artifactDetector;
     private readonly IAutoRepairEngine _autoRepairEngine;
+    private readonly IEdgeFusionEngine _edgeFusionEngine;
     private readonly ITiledProcessor _tiledProcessor;
 
     public StackService(
@@ -84,6 +85,7 @@ public sealed class StackService : IStackService
         IStackQualityAnalyzer? qualityAnalyzer = null,
         IArtifactDetector? artifactDetector = null,
         IAutoRepairEngine? autoRepairEngine = null,
+        IEdgeFusionEngine? edgeFusionEngine = null,
         ITiledProcessor? tiledProcessor = null)
     {
         _imageIO = imageIO;
@@ -93,6 +95,7 @@ public sealed class StackService : IStackService
         _qualityAnalyzer = qualityAnalyzer ?? new StandardStackQualityAnalyzer();
         _artifactDetector = artifactDetector ?? new StandardArtifactDetector();
         _autoRepairEngine = autoRepairEngine ?? new StandardAutoRepairEngine();
+        _edgeFusionEngine = edgeFusionEngine ?? new EdgeFusionEngine();
         _tiledProcessor = tiledProcessor ?? new StandardTiledProcessor();
     }
 
@@ -258,6 +261,23 @@ public sealed class StackService : IStackService
                 progress?.Report(new StackProgress("Auto Reconstruction", 100, $"Auto-repaired {repairReport.RepairedRegionsCount} regions"));
                 sw.Stop();
                 benchmark.AutoRepairTimeMs = sw.Elapsed.TotalMilliseconds;
+            }
+
+            // 10. Edge Discontinuity Reconstruction
+            if (settings.EnableEdgeReconstruction)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                sw.Restart();
+                progress?.Report(new StackProgress("Edge Reconstruction", 0, "Reconstructing edge discontinuities..."));
+                var currentImg = result.RepairedImage ?? result.FusedImage;
+                using var edgeRes = _edgeFusionEngine.ReconstructEdges(currentImg, frames, result.DepthResult.SourceFrameMap);
+                if (edgeRes.ReconstructedEdgeCount > 0)
+                {
+                    result.RepairedImage?.Dispose();
+                    result.RepairedImage = edgeRes.ReconstructedImage.Clone();
+                }
+                progress?.Report(new StackProgress("Edge Reconstruction", 100, $"Reconstructed {edgeRes.ReconstructedEdgeCount} edge pixels"));
+                sw.Stop();
             }
 
             totalStopwatch.Stop();

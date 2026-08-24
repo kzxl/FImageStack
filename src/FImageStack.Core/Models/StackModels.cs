@@ -94,6 +94,7 @@ public sealed class FusionSettings
     public bool EnableAutoRepair { get; set; } = false;
     public bool EnableLocalAlignment { get; set; } = false;
     public int LocalAlignmentGridSize { get; set; } = 8;
+    public bool EnableEdgeReconstruction { get; set; } = true;
     public bool EnableTiledProcessing { get; set; } = false;
     public int TileSize { get; set; } = 512;
 }
