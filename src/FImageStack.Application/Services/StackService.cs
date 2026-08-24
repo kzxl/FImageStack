@@ -1,14 +1,40 @@
 using System.Diagnostics;
 using FImageStack.Core;
 using FImageStack.Core.Alignment;
+using FImageStack.Core.Artifact;
 using FImageStack.Core.DepthMap;
 using FImageStack.Core.FocusMeasure;
 using FImageStack.Core.Fusion;
 using FImageStack.Core.Models;
+using FImageStack.Core.Motion;
+using FImageStack.Core.Quality;
+using FImageStack.Core.Reconstruction;
+using FImageStack.Core.Tiling;
 using FImageStack.Infrastructure.IO;
 using StackFrame = FImageStack.Core.Models.StackFrame;
 
 namespace FImageStack.Application.Services;
+
+public sealed class ProcessedStackResult : IDisposable
+{
+    public ImageBuffer<float> FusedImage { get; set; } = null!;
+    public ImageBuffer<float>? RepairedImage { get; set; }
+    public DepthMapResult DepthResult { get; set; } = null!;
+    public MotionDetectionResult? MotionResult { get; set; }
+    public ArtifactMap? ArtifactMap { get; set; }
+    public StackQualityReport? QualityReport { get; set; }
+    public RepairReport? RepairReport { get; set; }
+    public BenchmarkReport Benchmark { get; set; } = null!;
+
+    public void Dispose()
+    {
+        FusedImage?.Dispose();
+        RepairedImage?.Dispose();
+        DepthResult?.Dispose();
+        MotionResult?.Dispose();
+        ArtifactMap?.Dispose();
+    }
+}
 
 public sealed class BenchmarkReport
 {
@@ -17,9 +43,13 @@ public sealed class BenchmarkReport
     public int Height { get; set; }
     public double LoadTimeMs { get; set; }
     public double AlignmentTimeMs { get; set; }
+    public double MotionTimeMs { get; set; }
     public double FocusMeasureTimeMs { get; set; }
     public double DepthMapTimeMs { get; set; }
+    public double QualityAnalysisTimeMs { get; set; }
     public double FusionTimeMs { get; set; }
+    public double ArtifactDetectionTimeMs { get; set; }
+    public double AutoRepairTimeMs { get; set; }
     public double TotalTimeMs { get; set; }
     public long PeakWorkingSetMb { get; set; }
     public FusionMethod FusionMethod { get; set; }
@@ -28,7 +58,7 @@ public sealed class BenchmarkReport
 
 public interface IStackService
 {
-    Task<(ImageBuffer<float> FusedImage, DepthMapResult DepthResult, BenchmarkReport Benchmark)> ProcessStackAsync(
+    Task<ProcessedStackResult> ProcessStackAsync(
         IReadOnlyList<string> filePaths,
         FusionSettings settings,
         IProgress<StackProgress>? progress = null,
@@ -40,29 +70,46 @@ public sealed class StackService : IStackService
     private readonly IImageIO _imageIO;
     private readonly IAlignmentEngine _alignmentEngine;
     private readonly IDepthMapEstimator _depthMapEstimator;
+    private readonly IMotionDetector _motionDetector;
+    private readonly IStackQualityAnalyzer _qualityAnalyzer;
+    private readonly IArtifactDetector _artifactDetector;
+    private readonly IAutoRepairEngine _autoRepairEngine;
+    private readonly ITiledProcessor _tiledProcessor;
 
     public StackService(
         IImageIO imageIO,
         IAlignmentEngine? alignmentEngine = null,
-        IDepthMapEstimator? depthMapEstimator = null)
+        IDepthMapEstimator? depthMapEstimator = null,
+        IMotionDetector? motionDetector = null,
+        IStackQualityAnalyzer? qualityAnalyzer = null,
+        IArtifactDetector? artifactDetector = null,
+        IAutoRepairEngine? autoRepairEngine = null,
+        ITiledProcessor? tiledProcessor = null)
     {
         _imageIO = imageIO;
         _alignmentEngine = alignmentEngine ?? new FocusBreathingCompensator();
         _depthMapEstimator = depthMapEstimator ?? new StandardDepthMapEstimator();
+        _motionDetector = motionDetector ?? new FrameDifferenceMotionDetector();
+        _qualityAnalyzer = qualityAnalyzer ?? new StandardStackQualityAnalyzer();
+        _artifactDetector = artifactDetector ?? new StandardArtifactDetector();
+        _autoRepairEngine = autoRepairEngine ?? new StandardAutoRepairEngine();
+        _tiledProcessor = tiledProcessor ?? new StandardTiledProcessor();
     }
 
-    public async Task<(ImageBuffer<float> FusedImage, DepthMapResult DepthResult, BenchmarkReport Benchmark)> ProcessStackAsync(
+    public async Task<ProcessedStackResult> ProcessStackAsync(
         IReadOnlyList<string> filePaths,
         FusionSettings settings,
         IProgress<StackProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        var result = new ProcessedStackResult();
         var benchmark = new BenchmarkReport
         {
             FrameCount = filePaths.Count,
             FusionMethod = settings.Method,
             FocusMethod = settings.FocusMethod
         };
+        result.Benchmark = benchmark;
 
         var totalStopwatch = Stopwatch.StartNew();
         var sw = new Stopwatch();
@@ -94,7 +141,19 @@ public sealed class StackService : IStackService
             sw.Stop();
             benchmark.AlignmentTimeMs = sw.Elapsed.TotalMilliseconds;
 
-            // 3. Focus Measure Calculation
+            // 3. Motion Detection (Phase 9)
+            if (settings.EnableMotionSuppression)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                sw.Restart();
+                progress?.Report(new StackProgress("Motion Detection", 0, "Analyzing motion across frames..."));
+                result.MotionResult = _motionDetector.DetectMotion(frames);
+                progress?.Report(new StackProgress("Motion Detection", 100, $"Motion analyzed ({result.MotionResult.OverallMotionPercentage:F1}% dynamic)"));
+                sw.Stop();
+                benchmark.MotionTimeMs = sw.Elapsed.TotalMilliseconds;
+            }
+
+            // 4. Focus Measure Calculation
             cancellationToken.ThrowIfCancellationRequested();
             sw.Restart();
             progress?.Report(new StackProgress("Focus Measure", 0, "Computing sharpness maps..."));
@@ -117,21 +176,32 @@ public sealed class StackService : IStackService
             sw.Stop();
             benchmark.FocusMeasureTimeMs = sw.Elapsed.TotalMilliseconds;
 
-            // 4. Depth Map Estimation
+            // 5. Depth Map Estimation
             cancellationToken.ThrowIfCancellationRequested();
             sw.Restart();
             progress?.Report(new StackProgress("Depth Estimation", 0, "Estimating continuous depth map..."));
 
-            var depthResult = _depthMapEstimator.EstimateDepthMap(frames, settings.EnableDepthSmoothing, settings.SmoothingRadius);
+            result.DepthResult = _depthMapEstimator.EstimateDepthMap(frames, settings.EnableDepthSmoothing, settings.SmoothingRadius);
             progress?.Report(new StackProgress("Depth Estimation", 100, "Depth map computed."));
 
             sw.Stop();
             benchmark.DepthMapTimeMs = sw.Elapsed.TotalMilliseconds;
 
-            // 5. Fusion Stage
+            // 6. Quality & Focus Gap Analysis (Phase 10 & 11)
+            if (settings.EnableQualityAnalysis)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                sw.Restart();
+                progress?.Report(new StackProgress("Quality Analysis", 0, "Analyzing stack coverage and gaps..."));
+                result.QualityReport = _qualityAnalyzer.AnalyzeQuality(frames, result.DepthResult);
+                progress?.Report(new StackProgress("Quality Analysis", 100, $"Quality evaluated: {result.QualityReport.OverallScore:F0}% ({result.QualityReport.FocusCoverageRating})"));
+                sw.Stop();
+                benchmark.QualityAnalysisTimeMs = sw.Elapsed.TotalMilliseconds;
+            }
+
+            // 7. Fusion Stage (Phase 6 or Phase 12 Tiled)
             cancellationToken.ThrowIfCancellationRequested();
             sw.Restart();
-            progress?.Report(new StackProgress("Focus Fusion", 0, $"Applying {settings.Method} fusion..."));
 
             IFusionEngine fusionEngine = settings.Method switch
             {
@@ -140,21 +210,56 @@ public sealed class StackService : IStackService
                 _ => new MultiScalePyramidFusionEngine()
             };
 
-            var fusedImage = await Task.Run(() => fusionEngine.Fuse(frames, depthResult, settings), cancellationToken);
-            progress?.Report(new StackProgress("Focus Fusion", 100, "Fusion complete."));
+            if (settings.EnableTiledProcessing)
+            {
+                progress?.Report(new StackProgress("Tiled Fusion", 0, $"Fusing in {settings.TileSize}x{settings.TileSize} tiles..."));
+                result.FusedImage = await Task.Run(() => _tiledProcessor.ProcessTiled(frames, result.DepthResult, fusionEngine, settings, settings.TileSize), cancellationToken);
+            }
+            else
+            {
+                progress?.Report(new StackProgress("Focus Fusion", 0, $"Applying {settings.Method} fusion..."));
+                result.FusedImage = await Task.Run(() => fusionEngine.Fuse(frames, result.DepthResult, settings), cancellationToken);
+            }
 
+            progress?.Report(new StackProgress("Focus Fusion", 100, "Fusion complete."));
             sw.Stop();
             benchmark.FusionTimeMs = sw.Elapsed.TotalMilliseconds;
+
+            // 8. Artifact Detection (Phase 7)
+            if (settings.EnableArtifactDetection)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                sw.Restart();
+                progress?.Report(new StackProgress("Artifact Detection", 0, "Scanning for halos, ghosts, and seams..."));
+                result.ArtifactMap = _artifactDetector.DetectArtifacts(result.FusedImage, frames, result.DepthResult);
+                progress?.Report(new StackProgress("Artifact Detection", 100, $"Detected {result.ArtifactMap.Regions.Count} artifact regions"));
+                sw.Stop();
+                benchmark.ArtifactDetectionTimeMs = sw.Elapsed.TotalMilliseconds;
+            }
+
+            // 9. Auto Repair (Phase 8)
+            if (settings.EnableAutoRepair && result.ArtifactMap != null && result.ArtifactMap.Regions.Count > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                sw.Restart();
+                progress?.Report(new StackProgress("Auto Reconstruction", 0, "Repairing artifacts from source frames..."));
+                var (repaired, repairReport) = _autoRepairEngine.AutoRepair(result.FusedImage, frames, result.ArtifactMap);
+                result.RepairedImage = repaired;
+                result.RepairReport = repairReport;
+                progress?.Report(new StackProgress("Auto Reconstruction", 100, $"Auto-repaired {repairReport.RepairedRegionsCount} regions"));
+                sw.Stop();
+                benchmark.AutoRepairTimeMs = sw.Elapsed.TotalMilliseconds;
+            }
 
             totalStopwatch.Stop();
             benchmark.TotalTimeMs = totalStopwatch.Elapsed.TotalMilliseconds;
             benchmark.PeakWorkingSetMb = Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024);
 
-            return (fusedImage, depthResult, benchmark);
+            return result;
         }
         finally
         {
-            // Clean up individual frames to prevent memory leaks
+            // Dispose source frames to ensure zero memory leak
             foreach (var frame in frames)
             {
                 frame.Dispose();

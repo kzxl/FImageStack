@@ -86,6 +86,12 @@ public sealed class FusionSettings
     public bool EnableDepthSmoothing { get; set; } = true;
     public bool EnableNoiseAwareness { get; set; } = true;
     public bool EnableFocusBreathingCorrection { get; set; } = true;
+    public bool EnableQualityAnalysis { get; set; } = false;
+    public bool EnableMotionSuppression { get; set; } = false;
+    public bool EnableArtifactDetection { get; set; } = false;
+    public bool EnableAutoRepair { get; set; } = false;
+    public bool EnableTiledProcessing { get; set; } = false;
+    public int TileSize { get; set; } = 512;
 }
 
 public sealed class StackValidationResult

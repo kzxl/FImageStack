@@ -19,6 +19,12 @@ internal static class Program
         FusionMethod fusionMethod = FusionMethod.MultiScalePyramid;
         FocusMeasureMethod focusMethod = FocusMeasureMethod.ModifiedLaplacian;
         int pyramidLevels = 5;
+        bool qualityAnalysis = false;
+        bool motionAware = false;
+        bool detectArtifacts = false;
+        bool autoRepair = false;
+        bool tiled = false;
+        int tileSize = 512;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -35,6 +41,12 @@ internal static class Program
                 };
             }
             if (args[i] == "--levels" && i + 1 < args.Length) int.TryParse(args[++i], out pyramidLevels);
+            if (args[i] == "--analyze-quality") qualityAnalysis = true;
+            if (args[i] == "--motion-aware") motionAware = true;
+            if (args[i] == "--detect-artifacts") detectArtifacts = true;
+            if (args[i] == "--repair") { detectArtifacts = true; autoRepair = true; }
+            if (args[i] == "--tiled") tiled = true;
+            if (args[i] == "--tile-size" && i + 1 < args.Length) int.TryParse(args[++i], out tileSize);
         }
 
         var imageIO = new ImageSharpIO();
@@ -49,9 +61,9 @@ internal static class Program
             return 1;
         }
 
-        Console.WriteLine($"Scanning folder : {Path.GetFullPath(inputDir)}");
+        Console.WriteLine($"Scanning folder   : {Path.GetFullPath(inputDir)}");
         var imageFiles = projectService.DiscoverImageFiles(inputDir);
-        Console.WriteLine($"Found           : {imageFiles.Count} frames");
+        Console.WriteLine($"Found             : {imageFiles.Count} frames");
 
         var validation = projectService.ValidateStack(imageFiles);
         if (!validation.IsValid)
@@ -68,11 +80,18 @@ internal static class Program
             FocusMethod = focusMethod,
             PyramidLevels = pyramidLevels,
             EnableDepthSmoothing = true,
-            SmoothingRadius = 2
+            SmoothingRadius = 2,
+            EnableQualityAnalysis = qualityAnalysis,
+            EnableMotionSuppression = motionAware,
+            EnableArtifactDetection = detectArtifacts,
+            EnableAutoRepair = autoRepair,
+            EnableTiledProcessing = tiled,
+            TileSize = tileSize
         };
 
-        Console.WriteLine($"Fusion Strategy : {settings.Method} (Levels: {settings.PyramidLevels})");
-        Console.WriteLine($"Focus Measure   : {settings.FocusMethod}");
+        Console.WriteLine($"Fusion Strategy   : {settings.Method} (Levels: {settings.PyramidLevels})");
+        Console.WriteLine($"Focus Measure     : {settings.FocusMethod}");
+        Console.WriteLine($"Diagnostics Flags : Quality={settings.EnableQualityAnalysis}, Motion={settings.EnableMotionSuppression}, Artifacts={settings.EnableArtifactDetection}, Repair={settings.EnableAutoRepair}, Tiled={settings.EnableTiledProcessing}");
         Console.WriteLine("-------------------------------------------------");
 
         var progress = new Progress<StackProgress>(p =>
@@ -82,40 +101,91 @@ internal static class Program
 
         try
         {
-            var (fusedImage, depthResult, benchmark) = await stackService.ProcessStackAsync(imageFiles, settings, progress);
+            using var result = await stackService.ProcessStackAsync(imageFiles, settings, progress);
             Console.WriteLine();
             Console.WriteLine("-------------------------------------------------");
 
-            // Save final output image
-            Console.WriteLine($"Saving Fused Output to: {Path.GetFullPath(outputPath)}");
-            imageIO.SaveImage(fusedImage, outputPath, bitDepth: 8);
+            string outDir = Path.GetDirectoryName(outputPath) ?? ".";
+
+            // Save final output image (repaired if available, otherwise fused)
+            var finalImg = result.RepairedImage ?? result.FusedImage;
+            Console.WriteLine($"Saving Fused Output to  : {Path.GetFullPath(outputPath)}");
+            imageIO.SaveImage(finalImg, outputPath, bitDepth: 8);
 
             // Save Depth Map visualization
-            string depthOutPath = Path.Combine(Path.GetDirectoryName(outputPath) ?? ".", "output_depth_map.png");
-            imageIO.SaveImage(depthResult.DepthMap, depthOutPath, bitDepth: 8);
-            Console.WriteLine($"Saving Depth Map to   : {Path.GetFullPath(depthOutPath)}");
+            string depthOutPath = Path.Combine(outDir, "output_depth_map.png");
+            imageIO.SaveImage(result.DepthResult.DepthMap, depthOutPath, bitDepth: 8);
+            Console.WriteLine($"Saving Depth Map to     : {Path.GetFullPath(depthOutPath)}");
 
             // Save Confidence Map visualization
-            string confOutPath = Path.Combine(Path.GetDirectoryName(outputPath) ?? ".", "output_confidence_map.png");
-            imageIO.SaveImage(depthResult.ConfidenceMap, confOutPath, bitDepth: 8);
-            Console.WriteLine($"Saving Confidence Map : {Path.GetFullPath(confOutPath)}");
+            string confOutPath = Path.Combine(outDir, "output_confidence_map.png");
+            imageIO.SaveImage(result.DepthResult.ConfidenceMap, confOutPath, bitDepth: 8);
+            Console.WriteLine($"Saving Confidence Map   : {Path.GetFullPath(confOutPath)}");
+
+            // Save Motion Map if computed
+            if (result.MotionResult != null)
+            {
+                string motionOutPath = Path.Combine(outDir, "output_motion_map.png");
+                imageIO.SaveImage(result.MotionResult.MotionMap, motionOutPath, bitDepth: 8);
+                Console.WriteLine($"Saving Motion Map to    : {Path.GetFullPath(motionOutPath)}");
+            }
+
+            // Print Quality Report if enabled
+            if (result.QualityReport != null)
+            {
+                Console.WriteLine("=================================================");
+                Console.WriteLine(" STACK QUALITY & COVERAGE REPORT");
+                Console.WriteLine("=================================================");
+                Console.WriteLine($" Overall Quality Score  : {result.QualityReport.OverallScore:F1}% ({result.QualityReport.FocusCoverageRating})");
+                Console.WriteLine($" Focus Coverage         : {result.QualityReport.FocusCoveragePercentage:F1}%");
+                Console.WriteLine($" Detected Focus Gaps    : {result.QualityReport.DetectedGaps.Count}");
+                foreach (var gap in result.QualityReport.DetectedGaps)
+                {
+                    Console.WriteLine($"   * {gap.Description}");
+                }
+                foreach (var warn in result.QualityReport.Warnings)
+                {
+                    Console.ForegroundColor = ConsoleColor.Yellow;
+                    Console.WriteLine($"   [WARN] {warn}");
+                    Console.ResetColor();
+                }
+            }
+
+            // Print Artifact Report if enabled
+            if (result.ArtifactMap != null)
+            {
+                Console.WriteLine("=================================================");
+                Console.WriteLine(" ARTIFACT DETECTION & RECONSTRUCTION");
+                Console.WriteLine("=================================================");
+                Console.WriteLine($" Total Regions Detected : {result.ArtifactMap.Regions.Count}");
+                Console.WriteLine($"   - Halos              : {result.ArtifactMap.HaloCount}");
+                Console.WriteLine($"   - Ghosts             : {result.ArtifactMap.GhostCount}");
+                Console.WriteLine($"   - Low Confidence     : {result.ArtifactMap.LowConfidenceCount}");
+                if (result.RepairReport != null)
+                {
+                    Console.WriteLine($" Auto-Repaired Regions  : {result.RepairReport.RepairedRegionsCount}/{result.ArtifactMap.Regions.Count}");
+                    Console.WriteLine($" Auto-Repaired Pixels   : {result.RepairReport.RepairedPixelsCount:N0} pixels");
+                }
+            }
 
             // Print detailed Benchmark
+            var benchmark = result.Benchmark;
             Console.WriteLine("=================================================");
             Console.WriteLine(" PERFORMANCE BENCHMARK REPORT");
             Console.WriteLine("=================================================");
-            Console.WriteLine($" Stack Dimensions     : {benchmark.Width} x {benchmark.Height} ({benchmark.FrameCount} frames)");
-            Console.WriteLine($" Load Time            : {benchmark.LoadTimeMs:F1} ms");
-            Console.WriteLine($" Alignment Time       : {benchmark.AlignmentTimeMs:F1} ms");
-            Console.WriteLine($" Focus Measure Time   : {benchmark.FocusMeasureTimeMs:F1} ms");
-            Console.WriteLine($" Depth Map Time       : {benchmark.DepthMapTimeMs:F1} ms");
-            Console.WriteLine($" Fusion ({benchmark.FusionMethod,-13}): {benchmark.FusionTimeMs:F1} ms");
-            Console.WriteLine($" TOTAL PIPELINE TIME  : {benchmark.TotalTimeMs:F1} ms ({benchmark.TotalTimeMs / 1000.0:F2} s)");
-            Console.WriteLine($" Peak Working Set     : {benchmark.PeakWorkingSetMb} MB");
+            Console.WriteLine($" Stack Dimensions       : {benchmark.Width} x {benchmark.Height} ({benchmark.FrameCount} frames)");
+            Console.WriteLine($" Load Time              : {benchmark.LoadTimeMs:F1} ms");
+            Console.WriteLine($" Alignment Time         : {benchmark.AlignmentTimeMs:F1} ms");
+            if (benchmark.MotionTimeMs > 0) Console.WriteLine($" Motion Detection Time  : {benchmark.MotionTimeMs:F1} ms");
+            Console.WriteLine($" Focus Measure Time     : {benchmark.FocusMeasureTimeMs:F1} ms");
+            Console.WriteLine($" Depth Map Time         : {benchmark.DepthMapTimeMs:F1} ms");
+            if (benchmark.QualityAnalysisTimeMs > 0) Console.WriteLine($" Quality Analysis Time  : {benchmark.QualityAnalysisTimeMs:F1} ms");
+            Console.WriteLine($" Fusion ({benchmark.FusionMethod,-13}) : {benchmark.FusionTimeMs:F1} ms");
+            if (benchmark.ArtifactDetectionTimeMs > 0) Console.WriteLine($" Artifact Detection Time: {benchmark.ArtifactDetectionTimeMs:F1} ms");
+            if (benchmark.AutoRepairTimeMs > 0) Console.WriteLine($" Auto-Repair Time       : {benchmark.AutoRepairTimeMs:F1} ms");
+            Console.WriteLine($" TOTAL PIPELINE TIME    : {benchmark.TotalTimeMs:F1} ms ({benchmark.TotalTimeMs / 1000.0:F2} s)");
+            Console.WriteLine($" Peak Working Set       : {benchmark.PeakWorkingSetMb} MB");
             Console.WriteLine("=================================================");
-
-            fusedImage.Dispose();
-            depthResult.Dispose();
 
             return 0;
         }
