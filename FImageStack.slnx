@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/FImageStack.Application/FImageStack.Application.csproj" />
+    <Project Path="src/FImageStack.Cli/FImageStack.Cli.csproj" />
+    <Project Path="src/FImageStack.Core/FImageStack.Core.csproj" />
+    <Project Path="src/FImageStack.Infrastructure/FImageStack.Infrastructure.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/FImageStack.Core.Tests/FImageStack.Core.Tests.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/FImageStack.DatasetGenerator/FImageStack.DatasetGenerator.csproj" />
+  </Folder>
+</Solution>
