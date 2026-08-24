@@ -20,7 +20,8 @@ public enum AlignmentMode
     Rigid,         // Translation + Rotation
     Similarity,    // Translation + Rotation + Scale (Focus Breathing)
     Affine,        // 6 DOF (Translation + Rotation + Scale + Shear)
-    Homography     // 8 DOF (Perspective Transformation)
+    Homography,    // 8 DOF (Perspective Transformation)
+    OpticalFlow    // Dense Pyramidal Motion Vector Field (Per-Pixel Vector Alignment)
 }
 
 public enum FocusMeasureMethod

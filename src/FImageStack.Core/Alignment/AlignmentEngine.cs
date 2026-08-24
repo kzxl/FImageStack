@@ -54,15 +54,18 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
     private readonly IFocusBreathingEstimator _focusBreathingEstimator;
     private readonly ILensDistortionCorrector _lensCorrector;
     private readonly IHomographyEstimator _homographyEstimator;
+    private readonly IDenseOpticalFlowEstimator _opticalFlowEstimator;
 
     public AdvancedAlignmentEngine(
         IFocusBreathingEstimator? focusBreathingEstimator = null,
         ILensDistortionCorrector? lensCorrector = null,
-        IHomographyEstimator? homographyEstimator = null)
+        IHomographyEstimator? homographyEstimator = null,
+        IDenseOpticalFlowEstimator? opticalFlowEstimator = null)
     {
         _focusBreathingEstimator = focusBreathingEstimator ?? new FocusBreathingEstimator();
         _lensCorrector = lensCorrector ?? new LensDistortionCorrector();
         _homographyEstimator = homographyEstimator ?? new HomographyEstimator();
+        _opticalFlowEstimator = opticalFlowEstimator ?? new DenseOpticalFlowEstimator();
     }
 
     public unsafe void AlignStack(
@@ -93,7 +96,7 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
         }
 
         // Stage 2: Focus Breathing Scale Curve Estimation
-        if (correctFocusBreathing && (mode == AlignmentMode.Similarity || mode == AlignmentMode.Affine || mode == AlignmentMode.Homography))
+        if (correctFocusBreathing && (mode == AlignmentMode.Similarity || mode == AlignmentMode.Affine || mode == AlignmentMode.Homography || mode == AlignmentMode.OpticalFlow))
         {
             var breathingResult = _focusBreathingEstimator.EstimateScaleCurve(frames, refIndex);
             progress?.Report(new StackProgress("Auto Alignment", 10.0, $"Focus Breathing Curve: ΔM={breathingResult.TotalMagnificationShiftPercentage:+0.00;-0.00}%, R²={breathingResult.R2:F2}"));
@@ -110,8 +113,13 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
 
             var targetFrame = frames[i];
 
-            // Stage 3: Global Alignment (Perspective Homography vs Subpixel Similarity/Affine)
-            if (mode == AlignmentMode.Homography)
+            // Stage 3: Global & Dense Vector Alignment
+            if (mode == AlignmentMode.OpticalFlow)
+            {
+                using var flow = _opticalFlowEstimator.ComputeDenseFlow(refFrame, targetFrame, pyramidLevels: 3);
+                flow.ApplyDenseWarp(targetFrame);
+            }
+            else if (mode == AlignmentMode.Homography)
             {
                 var matches = FindPointCorrespondences(refFrame, targetFrame);
                 var h = _homographyEstimator.EstimateHomography(matches);
