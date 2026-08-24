@@ -76,6 +76,11 @@ public sealed class DepthMapResult : IDisposable
     public ImageBuffer<float> FocusGapMask { get; }
 
     /// <summary>
+    /// Goodness of Fit (R^2 in [0.0 - 1.0]) for the Gaussian Focus Transition Model.
+    /// </summary>
+    public ImageBuffer<float> R2FitMap { get; }
+
+    /// <summary>
     /// Optional underlying 3D Focus Volume tensor for deep inspection and retouching.
     /// </summary>
     public FocusVolume.FocusVolume? FocusVolume { get; set; }
@@ -89,6 +94,7 @@ public sealed class DepthMapResult : IDisposable
         ConfidenceMap = new ImageBuffer<float>(width, height, 1, PixelFormatType.GrayFloat32);
         DofMap = new ImageBuffer<float>(width, height, 1, PixelFormatType.GrayFloat32);
         FocusGapMask = new ImageBuffer<float>(width, height, 1, PixelFormatType.GrayFloat32);
+        R2FitMap = new ImageBuffer<float>(width, height, 1, PixelFormatType.GrayFloat32);
     }
 
     public void Dispose()
@@ -98,6 +104,7 @@ public sealed class DepthMapResult : IDisposable
         ConfidenceMap.Dispose();
         DofMap.Dispose();
         FocusGapMask.Dispose();
+        R2FitMap.Dispose();
         FocusVolume?.Dispose();
         FocusVolume = null;
     }

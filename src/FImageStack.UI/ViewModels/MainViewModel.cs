@@ -72,6 +72,20 @@ public sealed class PixelInspectorInfo : ViewModelBase
         }
     }
     public bool HasConfidenceBreakdown => !string.IsNullOrEmpty(_confidenceBreakdownText);
+
+    private string _transitionModelText = string.Empty;
+    public string TransitionModelText
+    {
+        get => _transitionModelText;
+        set
+        {
+            if (SetProperty(ref _transitionModelText, value))
+            {
+                OnPropertyChanged(nameof(HasTransitionModel));
+            }
+        }
+    }
+    public bool HasTransitionModel => !string.IsNullOrEmpty(_transitionModelText);
 }
 
 public sealed class ArtifactRegionViewModel : ViewModelBase
@@ -921,6 +935,7 @@ public sealed class MainViewModel : ViewModelBase
         }
 
         string breakdownText = $"Sharpness: {conf:F2} | Conf: {conf * 100f:F0}%";
+        string transitionText = string.Empty;
         if (depthRes.FocusVolume != null)
         {
             var profileSpan = depthRes.FocusVolume.GetProfile(x, y);
@@ -940,6 +955,10 @@ public sealed class MainViewModel : ViewModelBase
 
             float total = s * (0.35f + 0.65f * a) * (0.2f + 0.8f * (1f - Math.Clamp(m * 1.5f, 0f, 0.95f))) * (0.4f + 0.6f * e) * cons;
             breakdownText = $"S:{s:F2} | A:{a:F2} | M:{m:F2} | E:{e:F2} | Cons:{cons:F2} => Conf:{total:F2}";
+
+            var fitter = new FImageStack.Core.FocusVolume.FocusTransitionFitter();
+            var model = fitter.FitTransition(profileSpan);
+            transitionText = $"Gaussian Model: μ: {model.OptimalMu:F2} | σ: {model.TransitionSpread:F2} slices | A: {model.PeakAmplitude:F2} | R²: {model.GoodnessOfFit * 100f:F0}%";
         }
 
         InspectorInfo = new PixelInspectorInfo
@@ -955,7 +974,8 @@ public sealed class MainViewModel : ViewModelBase
             IsValidFocus = isValid,
             StatusBadge = isValid ? "✅ In-Focus" : (isGap ? "⚠️ Focus Gap" : "⚠️ Bokeh / Low Texture"),
             FocusCurveSummary = curveSummary,
-            ConfidenceBreakdownText = breakdownText
+            ConfidenceBreakdownText = breakdownText,
+            TransitionModelText = transitionText
         };
     }
 

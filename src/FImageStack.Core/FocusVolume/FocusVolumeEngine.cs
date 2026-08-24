@@ -12,10 +12,14 @@ public interface IFocusVolumeEngine
 public sealed class FocusVolumeEngine : IFocusVolumeEngine
 {
     private readonly Quality.IMultiFrameConsensusEngine _consensusEngine;
+    private readonly IFocusTransitionFitter _transitionFitter;
 
-    public FocusVolumeEngine(Quality.IMultiFrameConsensusEngine? consensusEngine = null)
+    public FocusVolumeEngine(
+        Quality.IMultiFrameConsensusEngine? consensusEngine = null,
+        IFocusTransitionFitter? transitionFitter = null)
     {
         _consensusEngine = consensusEngine ?? new Quality.MultiFrameConsensusEngine();
+        _transitionFitter = transitionFitter ?? new FocusTransitionFitter();
     }
 
     public FocusVolume BuildVolume(IReadOnlyList<StackFrame> frames)
@@ -64,6 +68,7 @@ public sealed class FocusVolumeEngine : IFocusVolumeEngine
         float* confMap = result.ConfidenceMap.DataPointer;
         float* dofMap = result.DofMap != null ? result.DofMap.DataPointer : null;
         float* gapMap = result.FocusGapMask != null ? result.FocusGapMask.DataPointer : null;
+        float* r2Map = result.R2FitMap != null ? result.R2FitMap.DataPointer : null;
 
         float[] priorityWeights = new float[frameCount];
         for (int i = 0; i < frameCount; i++)
@@ -71,7 +76,7 @@ public sealed class FocusVolumeEngine : IFocusVolumeEngine
             priorityWeights[i] = i < frames.Count ? frames[i].PriorityWeight : 1.0f;
         }
 
-        // Step 1: Sub-frame continuous peak fitting + DOF estimation per pixel
+        // Step 1: Continuous Focus Transition Gaussian Modeling + Sub-frame peak fitting
         Parallel.For(0, height, y =>
         {
             Span<float> profile = stackalloc float[frameCount];
@@ -88,100 +93,45 @@ public sealed class FocusVolumeEngine : IFocusVolumeEngine
                     profile[f] *= priorityWeights[f];
                 }
 
-                // 1. Find discrete best frame
-                int bestFrame = 0;
-                float maxSharpness = profile[0];
-                float sumSharpness = profile[0];
+                // 1. Fit Gaussian Focus Transition Model
+                var model = _transitionFitter.FitTransition(profile);
 
-                for (int f = 1; f < frameCount; f++)
-                {
-                    float val = profile[f];
-                    sumSharpness += val;
-                    if (val > maxSharpness)
-                    {
-                        maxSharpness = val;
-                        bestFrame = f;
-                    }
-                }
+                int discreteBestFrame = Math.Clamp((int)MathF.Round(model.OptimalMu), 0, frameCount - 1);
+                float normalizedDepth = frameCount > 1 ? Math.Clamp(model.OptimalMu / (frameCount - 1), 0f, 1f) : 0f;
 
-                // 2. Sub-frame Parabolic Fitting around peak
-                float subFrame = bestFrame;
-                if (bestFrame > 0 && bestFrame < frameCount - 1)
-                {
-                    float yPrev = profile[bestFrame - 1];
-                    float yCurr = profile[bestFrame];
-                    float yNext = profile[bestFrame + 1];
+                // 2. Confidence calculation (ratio of amplitude vs total profile energy)
+                float sumVal = 0f;
+                for (int f = 0; f < frameCount; f++) sumVal += profile[f];
+                float avgSharpness = sumVal / frameCount;
 
-                    float denom = 2f * (yPrev - 2f * yCurr + yNext);
-                    if (MathF.Abs(denom) > 1e-7f)
-                    {
-                        float delta = (yPrev - yNext) / denom;
-                        // Constrain delta to [-0.5, +0.5]
-                        delta = Math.Clamp(delta, -0.5f, 0.5f);
-                        subFrame = bestFrame + delta;
-                    }
-                }
-
-                float normalizedDepth = frameCount > 1 ? Math.Clamp(subFrame / (frameCount - 1), 0f, 1f) : 0f;
-
-                // 3. Confidence calculation (contrast ratio of peak vs mean)
-                float avgSharpness = sumSharpness / frameCount;
+                float maxSharpness = model.PeakAmplitude + model.BaselineFloor;
                 float confidence = avgSharpness > 1e-7f
                     ? Math.Clamp((maxSharpness - avgSharpness) / (maxSharpness + 1e-7f), 0f, 1f)
                     : 0f;
 
-                // 4. DOF Thickness (FWHM estimation across focus slices)
-                float halfMax = maxSharpness * 0.5f;
-                float leftZ = bestFrame;
-                float rightZ = bestFrame;
+                // Modulate confidence with Goodness of Fit R^2
+                confidence *= (0.5f + 0.5f * model.GoodnessOfFit);
 
-                // Trace left
-                for (int f = bestFrame; f >= 0; f--)
-                {
-                    if (profile[f] <= halfMax)
-                    {
-                        if (f < bestFrame)
-                        {
-                            float t = (halfMax - profile[f]) / (profile[f + 1] - profile[f] + 1e-7f);
-                            leftZ = f + t;
-                        }
-                        break;
-                    }
-                    if (f == 0) leftZ = 0;
-                }
+                // 3. Focus Gap Detection
+                bool isFocusGap = maxSharpness < 0.0005f || confidence < 0.10f || model.GoodnessOfFit < 0.20f;
 
-                // Trace right
-                for (int f = bestFrame; f < frameCount; f++)
-                {
-                    if (profile[f] <= halfMax)
-                    {
-                        if (f > bestFrame)
-                        {
-                            float t = (halfMax - profile[f - 1]) / (profile[f] - profile[f - 1] + 1e-7f);
-                            rightZ = (f - 1) + t;
-                        }
-                        break;
-                    }
-                    if (f == frameCount - 1) rightZ = frameCount - 1;
-                }
-
-                float dofThickness = Math.Max(0.5f, rightZ - leftZ);
-
-                // 5. Focus Gap / Low Texture detection
-                bool isFocusGap = maxSharpness < 0.0005f || confidence < 0.12f;
-
-                srcMap[pixelIdx] = bestFrame;
+                srcMap[pixelIdx] = discreteBestFrame;
                 depthMap[pixelIdx] = normalizedDepth;
                 confMap[pixelIdx] = confidence;
 
                 if (dofMap != null)
                 {
-                    dofMap[pixelIdx] = dofThickness / Math.Max(1, frameCount - 1);
+                    dofMap[pixelIdx] = (model.TransitionSpread * 2.355f) / Math.Max(1, frameCount - 1);
                 }
 
                 if (gapMap != null)
                 {
                     gapMap[pixelIdx] = isFocusGap ? 1.0f : 0.0f;
+                }
+
+                if (r2Map != null)
+                {
+                    r2Map[pixelIdx] = model.GoodnessOfFit;
                 }
             }
         });
