@@ -15,47 +15,6 @@ using StackFrame = FImageStack.Core.Models.StackFrame;
 
 namespace FImageStack.Application.Services;
 
-public sealed class ProcessedStackResult : IDisposable
-{
-    public ImageBuffer<float> FusedImage { get; set; } = null!;
-    public ImageBuffer<float>? RepairedImage { get; set; }
-    public DepthMapResult DepthResult { get; set; } = null!;
-    public MotionDetectionResult? MotionResult { get; set; }
-    public ArtifactMap? ArtifactMap { get; set; }
-    public StackQualityReport? QualityReport { get; set; }
-    public RepairReport? RepairReport { get; set; }
-    public BenchmarkReport Benchmark { get; set; } = null!;
-
-    public void Dispose()
-    {
-        FusedImage?.Dispose();
-        RepairedImage?.Dispose();
-        DepthResult?.Dispose();
-        MotionResult?.Dispose();
-        ArtifactMap?.Dispose();
-    }
-}
-
-public sealed class BenchmarkReport
-{
-    public int FrameCount { get; set; }
-    public int Width { get; set; }
-    public int Height { get; set; }
-    public double LoadTimeMs { get; set; }
-    public double AlignmentTimeMs { get; set; }
-    public double MotionTimeMs { get; set; }
-    public double FocusMeasureTimeMs { get; set; }
-    public double DepthMapTimeMs { get; set; }
-    public double QualityAnalysisTimeMs { get; set; }
-    public double FusionTimeMs { get; set; }
-    public double ArtifactDetectionTimeMs { get; set; }
-    public double AutoRepairTimeMs { get; set; }
-    public double TotalTimeMs { get; set; }
-    public long PeakWorkingSetMb { get; set; }
-    public FusionMethod FusionMethod { get; set; }
-    public FocusMeasureMethod FocusMethod { get; set; }
-}
-
 public interface IStackService
 {
     Task<ProcessedStackResult> ProcessStackAsync(

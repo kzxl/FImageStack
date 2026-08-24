@@ -10,6 +10,7 @@ using FImageStack.Core.Acceleration;
 using FImageStack.Core.Models;
 using FImageStack.Core.PostProcessing;
 using FImageStack.Core.Presets;
+using FImageStack.Core.Project;
 using FImageStack.Core.Quality;
 using FImageStack.Core.Retouch;
 using FImageStack.Core.Selection;
@@ -587,6 +588,8 @@ public sealed class MainViewModel : ViewModelBase
     // Commands
     public ICommand LoadFolderCommand { get; }
     public ICommand LoadSampleStackCommand { get; }
+    public ICommand SaveProjectCommand { get; }
+    public ICommand OpenProjectCommand { get; }
     public ICommand StartStackingCommand { get; }
     public ICommand StartPreviewStackCommand { get; }
     public ICommand StartFullMasterRenderCommand { get; }
@@ -625,6 +628,8 @@ public sealed class MainViewModel : ViewModelBase
 
         LoadFolderCommand = new RelayCommand(ExecuteLoadFolder);
         LoadSampleStackCommand = new RelayCommand(ExecuteLoadSampleStack);
+        SaveProjectCommand = new AsyncRelayCommand(ExecuteSaveProjectAsync, () => !IsProcessing);
+        OpenProjectCommand = new AsyncRelayCommand(ExecuteOpenProjectAsync, () => !IsProcessing);
         StartStackingCommand = new AsyncRelayCommand(() => ExecuteStartStackingAsync(), () => !IsProcessing && Frames.Count >= 2);
         StartPreviewStackCommand = new AsyncRelayCommand(() => ExecuteStartStackingAsync(ResolutionMode.FastPreview1280), () => !IsProcessing && Frames.Count >= 2);
         StartFullMasterRenderCommand = new AsyncRelayCommand(() => ExecuteStartStackingAsync(ResolutionMode.FullMaster), () => !IsProcessing && Frames.Count >= 2);
@@ -894,6 +899,165 @@ public sealed class MainViewModel : ViewModelBase
         if (dialog.ShowDialog() == true)
         {
             LoadFolder(dialog.FolderName);
+        }
+    }
+
+    private async Task ExecuteSaveProjectAsync()
+    {
+        var activeFiles = Frames.Select(f => f.FilePath).ToList();
+        if (activeFiles.Count == 0 && _lastResult == null)
+        {
+            MessageBox.Show("No active project to save. Please load frames or run a stack first.", "FImageStack", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dlg = new SaveFileDialog
+        {
+            Title = "Save FImageStack Project",
+            Filter = "FImageStack Project (*.fstack)|*.fstack",
+            DefaultExt = ".fstack",
+            FileName = "Macro_Stack_Project.fstack"
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            try
+            {
+                StatusMessage = "Packaging and saving project...";
+                var project = new FStackProject
+                {
+                    SourceFilePaths = activeFiles,
+                    Settings = new FusionSettings
+                    {
+                        Method = SelectedMethod,
+                        FocusMethod = SelectedFocusMethod,
+                        AlignmentMode = SelectedAlignmentMode,
+                        PyramidLevels = PyramidLevels,
+                        SmoothingRadius = SmoothingRadius,
+                        EnableQualityAnalysis = EnableQualityAnalysis,
+                        EnableMotionSuppression = EnableMotionSuppression,
+                        EnableArtifactDetection = EnableArtifactDetection,
+                        EnableAutoRepair = EnableAutoRepair,
+                        EnableLocalAlignment = EnableLocalAlignment,
+                        EnableEdgeReconstruction = EnableEdgeReconstruction,
+                        EnableTiledProcessing = EnableTiledProcessing,
+                        TileSize = _tileSize
+                    },
+                    PostProcess = new PostProcessSettings
+                    {
+                        Exposure = ExposureCompensation,
+                        Contrast = ContrastAdjustment,
+                        Clarity = ClarityAdjustment,
+                        Sharpening = SharpeningAdjustment,
+                        Saturation = SaturationAdjustment,
+                        ToneMapping = SelectedToneMapping
+                    }
+                };
+
+                await _projectService.SaveProjectAsync(dlg.FileName, project, _lastResult, _retouchLayer);
+                StatusMessage = $"Project successfully saved to {Path.GetFileName(dlg.FileName)}.";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to save project:\n{ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusMessage = $"Save error: {ex.Message}";
+            }
+        }
+    }
+
+    private async Task ExecuteOpenProjectAsync()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "Open FImageStack Project",
+            Filter = "FImageStack Project (*.fstack)|*.fstack",
+            DefaultExt = ".fstack"
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            try
+            {
+                StatusMessage = "Loading project cache (Zero-Recomputation)...";
+                var loaded = await _projectService.LoadProjectAsync(dlg.FileName);
+
+                // Restore Frames
+                Frames.Clear();
+                int idx = 0;
+                foreach (var path in loaded.Project.SourceFilePaths)
+                {
+                    if (File.Exists(path))
+                    {
+                        Frames.Add(new FrameItemViewModel
+                        {
+                            Index = idx++,
+                            FilePath = path
+                        });
+                    }
+                }
+
+                // Restore Settings
+                SelectedMethod = loaded.Project.Settings.Method;
+                SelectedFocusMethod = loaded.Project.Settings.FocusMethod;
+                SelectedAlignmentMode = loaded.Project.Settings.AlignmentMode;
+                PyramidLevels = loaded.Project.Settings.PyramidLevels;
+                SmoothingRadius = loaded.Project.Settings.SmoothingRadius;
+                EnableQualityAnalysis = loaded.Project.Settings.EnableQualityAnalysis;
+                EnableMotionSuppression = loaded.Project.Settings.EnableMotionSuppression;
+                EnableArtifactDetection = loaded.Project.Settings.EnableArtifactDetection;
+                EnableAutoRepair = loaded.Project.Settings.EnableAutoRepair;
+                EnableLocalAlignment = loaded.Project.Settings.EnableLocalAlignment;
+                EnableEdgeReconstruction = loaded.Project.Settings.EnableEdgeReconstruction;
+                EnableTiledProcessing = loaded.Project.Settings.EnableTiledProcessing;
+                TileSize = loaded.Project.Settings.TileSize;
+
+                // Restore Post-Processing
+                ExposureCompensation = loaded.Project.PostProcess.Exposure;
+                ContrastAdjustment = loaded.Project.PostProcess.Contrast;
+                ClarityAdjustment = loaded.Project.PostProcess.Clarity;
+                SharpeningAdjustment = loaded.Project.PostProcess.Sharpening;
+                SaturationAdjustment = loaded.Project.PostProcess.Saturation;
+                SelectedToneMapping = loaded.Project.PostProcess.ToneMapping;
+
+                // Restore Cached Results & Retouch
+                if (loaded.CachedResult != null)
+                {
+                    _lastResult?.Dispose();
+                    _lastResult = loaded.CachedResult;
+
+                    _retouchLayer?.Dispose();
+                    _retouchLayer = loaded.RestoredRetouchLayer ?? new RetouchLayer(loaded.CachedResult.FusedImage.Width, loaded.CachedResult.FusedImage.Height);
+                    UpdateRetouchStrokesCount();
+
+                    ApplyLivePostProcessing();
+
+                    TurboDepthBitmap = BitmapHelper.ToTurboColormapBitmap(loaded.CachedResult.DepthResult.DepthMap, loaded.CachedResult.DepthResult.ConfidenceMap);
+                    ConfidenceMapBitmap = BitmapHelper.ToBitmapSource(loaded.CachedResult.DepthResult.ConfidenceMap);
+                    InvalidRegionBitmap = BitmapHelper.ToInvalidRegionBitmap(loaded.CachedResult.DepthResult.ConfidenceMap);
+
+                    if (loaded.Project.QualityReport != null)
+                    {
+                        QualityScoreText = $"{loaded.Project.QualityReport.OverallScore:F1}% ({loaded.Project.QualityReport.FocusCoverageRating})";
+                        FocusCoverageText = $"{loaded.Project.QualityReport.FocusCoveragePercentage:F1}%";
+                        MetricAlignmentScore = loaded.Project.QualityReport.AlignmentScore;
+                        MetricFocusCoverageScore = loaded.Project.QualityReport.FocusCoverageScore;
+                        MetricGhostingPercent = loaded.Project.QualityReport.GhostingPercent;
+                        MetricHaloPercent = loaded.Project.QualityReport.HaloPercent;
+                        MetricNoisePercent = loaded.Project.QualityReport.NoisePercent;
+                        MetricEdgeQualityScore = loaded.Project.QualityReport.EdgeQualityScore;
+                    }
+
+                    SelectedViewTab = 0;
+                    UpdateDisplayBitmap();
+                }
+
+                StatusMessage = $"Project loaded from {Path.GetFileName(dlg.FileName)} with Zero Recomputation!";
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to open project:\n{ex.Message}", "Open Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                StatusMessage = $"Open error: {ex.Message}";
+            }
         }
     }
 

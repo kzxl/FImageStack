@@ -53,7 +53,10 @@
                     <Button Content="100 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="100" Margin="0,0,6,0" Padding="10,5" />
                     <Button Content="200 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="200" Margin="0,0,12,0" Padding="10,5" />
 
-                    <Button Content="📂 Open Folder..." Style="{StaticResource ModernButton}" Command="{Binding LoadFolderCommand}" FontWeight="Bold" Padding="12,6" />
+                    <Button Content="📁 Save Project..." Style="{StaticResource ModernButton}" Command="{Binding SaveProjectCommand}" Background="#1E1B4B" BorderBrush="#6366F1" Foreground="#C7D2FE" FontWeight="Bold" Margin="0,0,6,0" Padding="12,6" ToolTip="Save non-destructive *.fstack project package with zero-recomputation cache" />
+                    <Button Content="📂 Open Project..." Style="{StaticResource ModernButton}" Command="{Binding OpenProjectCommand}" Background="#0F172A" BorderBrush="#38BDF8" Foreground="#E0F2FE" FontWeight="Bold" Margin="0,0,10,0" Padding="12,6" ToolTip="Open existing *.fstack project package instantly without recomputing" />
+
+                    <Button Content="📁 Open Folder..." Style="{StaticResource ModernButton}" Command="{Binding LoadFolderCommand}" FontWeight="Bold" Padding="12,6" />
                 </StackPanel>
             </Grid>
         </Border>
