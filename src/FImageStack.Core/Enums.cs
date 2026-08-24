@@ -37,7 +37,8 @@ public enum FusionMethod
     WinnerTakesAll,
     FocusWeighted,
     MultiScalePyramid,
-    WaveletDWT
+    WaveletDWT,
+    HDRFocusExposure
 }
 
 public enum ArtifactType

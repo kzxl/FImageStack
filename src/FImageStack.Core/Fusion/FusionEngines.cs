@@ -191,7 +191,7 @@ public sealed class MultiScalePyramidFusionEngine : IFusionEngine
         return reconstructed;
     }
 
-    private static unsafe void BlendPyramidLevel(ImageBuffer<float> fusedLevel, ImageBuffer<float> frameLaplacian, ImageBuffer<float> frameWeight)
+    internal static unsafe void BlendPyramidLevel(ImageBuffer<float> fusedLevel, ImageBuffer<float> frameLaplacian, ImageBuffer<float> frameWeight)
     {
         int w = fusedLevel.Width;
         int h = fusedLevel.Height;
@@ -215,7 +215,7 @@ public sealed class MultiScalePyramidFusionEngine : IFusionEngine
         });
     }
 
-    private static unsafe ImageBuffer<float>[] BuildGaussianPyramid(ImageBuffer<float> image, int levels)
+    internal static unsafe ImageBuffer<float>[] BuildGaussianPyramid(ImageBuffer<float> image, int levels)
     {
         var pyramid = new ImageBuffer<float>[levels];
         pyramid[0] = image.Clone();
@@ -227,7 +227,7 @@ public sealed class MultiScalePyramidFusionEngine : IFusionEngine
         return pyramid;
     }
 
-    private static unsafe ImageBuffer<float>[] BuildLaplacianPyramid(ImageBuffer<float> image, int levels)
+    internal static unsafe ImageBuffer<float>[] BuildLaplacianPyramid(ImageBuffer<float> image, int levels)
     {
         var gPyr = BuildGaussianPyramid(image, levels);
         var lPyr = new ImageBuffer<float>[levels];
@@ -244,7 +244,7 @@ public sealed class MultiScalePyramidFusionEngine : IFusionEngine
         return lPyr;
     }
 
-    private static unsafe ImageBuffer<float> ReconstructFromLaplacianPyramid(ImageBuffer<float>[] laplacians)
+    internal static unsafe ImageBuffer<float> ReconstructFromLaplacianPyramid(ImageBuffer<float>[] laplacians)
     {
         int levels = laplacians.Length;
         var current = laplacians[levels - 1].Clone();

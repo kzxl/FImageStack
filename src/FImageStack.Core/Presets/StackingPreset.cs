@@ -102,6 +102,28 @@ public sealed class StackingPreset
                     EnableAutoRepair = true,
                     EnableFocusBreathingCorrection = true
                 }
+            },
+            new()
+            {
+                Type = StackingPresetType.Custom,
+                Name = "HDR Focus & Exposure Studio",
+                Description = "Mertens-Focus hybrid multi-scale stacking for sequences with varying focus AND exposure brackets (Macro specular highlights & Landscape HDR).",
+                Icon = "🌈",
+                Settings = new FusionSettings
+                {
+                    Method = FusionMethod.HDRFocusExposure,
+                    FocusMethod = FocusMeasureMethod.ModifiedLaplacian,
+                    PyramidLevels = 6,
+                    SmoothingRadius = 3,
+                    EnableDepthSmoothing = true,
+                    EnableMotionSuppression = true,
+                    EnableQualityAnalysis = true,
+                    EnableArtifactDetection = true,
+                    EnableAutoRepair = true,
+                    EnableLocalAlignment = true,
+                    EnableEdgeReconstruction = true,
+                    EnableFocusBreathingCorrection = true
+                }
             }
         };
     }
