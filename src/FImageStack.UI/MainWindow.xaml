@@ -141,20 +141,23 @@
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto" /> <!-- Multi-view Tab Headers -->
                     <RowDefinition Height="Auto" /> <!-- Split-Screen Comparison Bar (if active) -->
-                    <RowDefinition Height="*" />    <!-- Main Image Viewport -->
+                    <RowDefinition Height="*" />    <!-- Main Image Viewport with Inspector HUD -->
                 </Grid.RowDefinitions>
 
                 <!-- Multi-view Tab Headers -->
                 <Border Grid.Row="0" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="12,4,12,0">
-                    <StackPanel Orientation="Horizontal">
-                        <RadioButton Content="✨ Fused Output" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsFusedTabSelected}" GroupName="ViewTabs" />
-                        <RadioButton Content="⚡ A/B Split View" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsSplitTabSelected}" GroupName="ViewTabs" ToolTip="Side-by-side comparison slider between Fused output and Selected frame" />
-                        <RadioButton Content="🌐 Depth Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsDepthTabSelected}" GroupName="ViewTabs" />
-                        <RadioButton Content="🎯 Confidence Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsConfidenceTabSelected}" GroupName="ViewTabs" />
-                        <RadioButton Content="🍃 Motion Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsMotionTabSelected}" GroupName="ViewTabs" />
-                        <RadioButton Content="🛡️ Artifacts &amp; Repair" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsArtifactTabSelected}" GroupName="ViewTabs" />
-                        <RadioButton Content="🖼️ Source Frame" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsSourceTabSelected}" GroupName="ViewTabs" />
-                    </StackPanel>
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                        <StackPanel Orientation="Horizontal">
+                            <RadioButton Content="✨ Fused Output" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsFusedTabSelected}" GroupName="ViewTabs" />
+                            <RadioButton Content="⚡ A/B Split View" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsSplitTabSelected}" GroupName="ViewTabs" ToolTip="Side-by-side comparison slider between Fused output and Selected frame" />
+                            <RadioButton Content="🌈 Turbo Depth 3D" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsDepthTabSelected}" GroupName="ViewTabs" ToolTip="Thermal pseudo-color map (Near=Red, Far=Blue)" />
+                            <RadioButton Content="🎯 Confidence Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsConfidenceTabSelected}" GroupName="ViewTabs" />
+                            <RadioButton Content="🚫 Invalid &amp; Gaps" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsInvalidTabSelected}" GroupName="ViewTabs" ToolTip="Out-of-focus background and missing focus planes" />
+                            <RadioButton Content="🍃 Motion Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsMotionTabSelected}" GroupName="ViewTabs" />
+                            <RadioButton Content="🛡️ Artifacts &amp; Repair" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsArtifactTabSelected}" GroupName="ViewTabs" />
+                            <RadioButton Content="🖼️ Source Frame" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsSourceTabSelected}" GroupName="ViewTabs" />
+                        </StackPanel>
+                    </ScrollViewer>
                 </Border>
 
                 <!-- Split-Screen Slider Bar -->
@@ -172,13 +175,38 @@
                     </Grid>
                 </Border>
 
-                <!-- Main Image Viewport -->
-                <ScrollViewer Grid.Row="2" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
-                    <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10">
-                        <!-- Image Display -->
-                        <Image Source="{Binding DisplayBitmap}" Stretch="None" RenderOptions.BitmapScalingMode="HighQuality" />
-                    </Grid>
-                </ScrollViewer>
+                <!-- Main Image Viewport with Inspector Overlay -->
+                <Grid Grid.Row="2">
+                    <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+                        <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10">
+                            <!-- Image Display with Mouse Events for Pixel Inspector -->
+                            <Image Source="{Binding DisplayBitmap}" Stretch="None" RenderOptions.BitmapScalingMode="HighQuality"
+                                   Cursor="Cross"
+                                   MouseMove="Image_MouseMove"
+                                   MouseDown="Image_MouseDown" />
+                        </Grid>
+                    </ScrollViewer>
+
+                    <!-- Interactive Pixel Inspector HUD Overlay (Floating at Bottom-Left) -->
+                    <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16"
+                            Background="#DD161926" BorderBrush="{StaticResource BorderHover}" BorderThickness="1"
+                            CornerRadius="8" Padding="12,8"
+                            Visibility="{Binding InspectorInfo, Converter={StaticResource BoolToVis}}">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <Border Background="{StaticResource PrimaryAccent}" CornerRadius="4" Padding="6,2" Margin="0,0,10,0">
+                                <TextBlock Text="🔍 PROBE" FontWeight="Bold" FontSize="11" Foreground="#FFFFFF" />
+                            </Border>
+                            <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="12" VerticalAlignment="Center">
+                                <Run Text="Coord: (" /><Run Text="{Binding InspectorInfo.PixelX, Mode=OneWay}" FontWeight="Bold" Foreground="#FFFFFF" /><Run Text="," /><Run Text="{Binding InspectorInfo.PixelY, Mode=OneWay}" FontWeight="Bold" Foreground="#FFFFFF" /><Run Text=")  |  " />
+                                <Run Text="Source Frame: " /><Run Text="{Binding InspectorInfo.SourceFrameFileName, Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource PrimaryAccent}" /><Run Text="  |  " />
+                                <Run Text="Depth Z: " /><Run Text="{Binding InspectorInfo.DepthZ, StringFormat='{}{0:F2}', Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource WarningAccent}" /><Run Text="  |  " />
+                                <Run Text="Conf: " /><Run Text="{Binding InspectorInfo.ConfidencePercentage, StringFormat='{}{0:F0}%', Mode=OneWay}" FontWeight="Bold" Foreground="{StaticResource SuccessAccent}" /><Run Text=" " />
+                                <Run Text="{Binding InspectorInfo.StatusBadge, Mode=OneWay}" FontWeight="SemiBold" />
+                            </TextBlock>
+                            <Button Content="👁️ View Frame" Style="{StaticResource ModernButton}" Command="{Binding JumpToInspectedFrameCommand}" Margin="12,0,0,0" Padding="8,3" FontSize="11" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
             </Grid>
 
             <!-- C. Right Sidebar: Settings, Post-Processing, Diagnostics & Metrics -->

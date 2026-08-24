@@ -17,6 +17,27 @@ using Microsoft.Win32;
 
 namespace FImageStack.UI.ViewModels;
 
+public sealed class PixelInspectorInfo : ViewModelBase
+{
+    private int _pixelX;
+    private int _pixelY;
+    private int _sourceFrameIndex;
+    private string _sourceFrameFileName = string.Empty;
+    private float _depthZ;
+    private float _confidencePercentage;
+    private bool _isValidFocus;
+    private string _statusBadge = string.Empty;
+
+    public int PixelX { get => _pixelX; set => SetProperty(ref _pixelX, value); }
+    public int PixelY { get => _pixelY; set => SetProperty(ref _pixelY, value); }
+    public int SourceFrameIndex { get => _sourceFrameIndex; set => SetProperty(ref _sourceFrameIndex, value); }
+    public string SourceFrameFileName { get => _sourceFrameFileName; set => SetProperty(ref _sourceFrameFileName, value); }
+    public float DepthZ { get => _depthZ; set => SetProperty(ref _depthZ, value); }
+    public float ConfidencePercentage { get => _confidencePercentage; set => SetProperty(ref _confidencePercentage, value); }
+    public bool IsValidFocus { get => _isValidFocus; set => SetProperty(ref _isValidFocus, value); }
+    public string StatusBadge { get => _statusBadge; set => SetProperty(ref _statusBadge, value); }
+}
+
 public sealed class MainViewModel : ViewModelBase
 {
     private readonly IStackService _stackService;
@@ -33,7 +54,7 @@ public sealed class MainViewModel : ViewModelBase
     private string _currentStage = "Ready";
     private string _statusMessage = "Select a folder or click a quick sample stack to begin.";
 
-    // Active Display Tab: 0=Fused, 1=Depth, 2=Confidence, 3=Motion, 4=Artifacts, 5=Source, 6=Split Comparison
+    // Active Display Tab: 0=Fused, 1=Split, 2=Turbo Depth, 3=Confidence, 4=Invalid/Bokeh, 5=Motion, 6=Artifacts, 7=Source
     private int _selectedViewTab = 0;
     private BitmapSource? _displayBitmap;
     private FrameItemViewModel? _selectedFrame;
@@ -57,6 +78,9 @@ public sealed class MainViewModel : ViewModelBase
 
     // Split Comparison
     private double _splitRatio = 0.5;
+
+    // Pixel Inspector
+    private PixelInspectorInfo? _inspectorInfo;
 
     // Post-Processing Settings
     private float _exposureCompensation = 0.0f;
@@ -117,12 +141,13 @@ public sealed class MainViewModel : ViewModelBase
             if (SetProperty(ref _selectedViewTab, value))
             {
                 OnPropertyChanged(nameof(IsFusedTabSelected));
+                OnPropertyChanged(nameof(IsSplitTabSelected));
                 OnPropertyChanged(nameof(IsDepthTabSelected));
                 OnPropertyChanged(nameof(IsConfidenceTabSelected));
+                OnPropertyChanged(nameof(IsInvalidTabSelected));
                 OnPropertyChanged(nameof(IsMotionTabSelected));
                 OnPropertyChanged(nameof(IsArtifactTabSelected));
                 OnPropertyChanged(nameof(IsSourceTabSelected));
-                OnPropertyChanged(nameof(IsSplitTabSelected));
                 UpdateDisplayBitmap();
             }
         }
@@ -134,40 +159,46 @@ public sealed class MainViewModel : ViewModelBase
         set { if (value) SelectedViewTab = 0; }
     }
 
-    public bool IsDepthTabSelected
+    public bool IsSplitTabSelected
     {
         get => SelectedViewTab == 1;
         set { if (value) SelectedViewTab = 1; }
     }
 
-    public bool IsConfidenceTabSelected
+    public bool IsDepthTabSelected
     {
         get => SelectedViewTab == 2;
         set { if (value) SelectedViewTab = 2; }
     }
 
-    public bool IsMotionTabSelected
+    public bool IsConfidenceTabSelected
     {
         get => SelectedViewTab == 3;
         set { if (value) SelectedViewTab = 3; }
     }
 
-    public bool IsArtifactTabSelected
+    public bool IsInvalidTabSelected
     {
         get => SelectedViewTab == 4;
         set { if (value) SelectedViewTab = 4; }
     }
 
-    public bool IsSourceTabSelected
+    public bool IsMotionTabSelected
     {
         get => SelectedViewTab == 5;
         set { if (value) SelectedViewTab = 5; }
     }
 
-    public bool IsSplitTabSelected
+    public bool IsArtifactTabSelected
     {
         get => SelectedViewTab == 6;
         set { if (value) SelectedViewTab = 6; }
+    }
+
+    public bool IsSourceTabSelected
+    {
+        get => SelectedViewTab == 7;
+        set { if (value) SelectedViewTab = 7; }
     }
 
     public BitmapSource? DisplayBitmap
@@ -183,7 +214,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (SetProperty(ref _selectedFrame, value))
             {
-                if (SelectedViewTab == 5 || SelectedViewTab == 6)
+                if (SelectedViewTab == 7 || SelectedViewTab == 1)
                 {
                     UpdateDisplayBitmap();
                 }
@@ -210,9 +241,15 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (SetProperty(ref _splitRatio, value))
             {
-                if (SelectedViewTab == 6) UpdateDisplayBitmap();
+                if (SelectedViewTab == 1) UpdateDisplayBitmap();
             }
         }
+    }
+
+    public PixelInspectorInfo? InspectorInfo
+    {
+        get => _inspectorInfo;
+        set => SetProperty(ref _inspectorInfo, value);
     }
 
     // Post-Processing Settings Properties
@@ -379,8 +416,9 @@ public sealed class MainViewModel : ViewModelBase
 
     // Cached Bitmap Sources
     public BitmapSource? FusedBitmap { get; private set; }
-    public BitmapSource? DepthMapBitmap { get; private set; }
+    public BitmapSource? TurboDepthBitmap { get; private set; }
     public BitmapSource? ConfidenceMapBitmap { get; private set; }
+    public BitmapSource? InvalidRegionBitmap { get; private set; }
     public BitmapSource? MotionMapBitmap { get; private set; }
     public BitmapSource? ArtifactMapBitmap { get; private set; }
 
@@ -392,6 +430,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand ExportResultCommand { get; }
     public ICommand SelectAllFramesCommand { get; }
     public ICommand ResetPostProcessingCommand { get; }
+    public ICommand JumpToInspectedFrameCommand { get; }
 
     public MainViewModel()
     {
@@ -426,6 +465,15 @@ public sealed class MainViewModel : ViewModelBase
             SaturationAdjustment = 1.0f;
         });
 
+        JumpToInspectedFrameCommand = new RelayCommand(_ =>
+        {
+            if (InspectorInfo != null && InspectorInfo.SourceFrameIndex >= 0 && InspectorInfo.SourceFrameIndex < Frames.Count)
+            {
+                SelectedFrame = Frames[InspectorInfo.SourceFrameIndex];
+                SelectedViewTab = 7; // Switch to Source Frame tab
+            }
+        });
+
         // Try pre-loading test dataset if available
         string defaultSample = @"data\test_stack_50";
         if (Directory.Exists(defaultSample))
@@ -434,10 +482,42 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
+    public unsafe void InspectPixel(int x, int y)
+    {
+        if (_lastResult == null || _lastResult.DepthResult == null) return;
+
+        var depthRes = _lastResult.DepthResult;
+        int w = depthRes.Width;
+        int h = depthRes.Height;
+
+        if (x < 0 || x >= w || y < 0 || y >= h) return;
+
+        int idx = y * w + x;
+        int frameIdx = depthRes.SourceFrameMap.DataPointer[idx];
+        float depthZ = depthRes.DepthMap.DataPointer[idx];
+        float conf = depthRes.ConfidenceMap.DataPointer[idx];
+
+        string fileName = (frameIdx >= 0 && frameIdx < Frames.Count) ? Frames[frameIdx].FileName : $"Frame #{frameIdx + 1}";
+        bool isValid = conf >= 0.15f;
+
+        InspectorInfo = new PixelInspectorInfo
+        {
+            PixelX = x,
+            PixelY = y,
+            SourceFrameIndex = frameIdx,
+            SourceFrameFileName = fileName,
+            DepthZ = depthZ,
+            ConfidencePercentage = conf * 100f,
+            IsValidFocus = isValid,
+            StatusBadge = isValid ? "✅ In-Focus" : "⚠️ Focus Gap / Bokeh"
+        };
+    }
+
     private void ApplyPreset(StackingPreset preset)
     {
         SelectedMethod = preset.Settings.Method;
         SelectedFocusMethod = preset.Settings.FocusMethod;
+        SelectedAlignmentMode = preset.Settings.AlignmentMode;
         PyramidLevels = preset.Settings.PyramidLevels;
         SmoothingRadius = preset.Settings.SmoothingRadius;
         EnableQualityAnalysis = preset.Settings.EnableQualityAnalysis;
@@ -544,11 +624,11 @@ public sealed class MainViewModel : ViewModelBase
             _lastResult = result;
 
             // Generate Bitmaps
-            var baseImg = result.RepairedImage ?? result.FusedImage;
             ApplyLivePostProcessing();
 
-            DepthMapBitmap = BitmapHelper.ToBitmapSource(result.DepthResult.DepthMap);
+            TurboDepthBitmap = BitmapHelper.ToTurboColormapBitmap(result.DepthResult.DepthMap, result.DepthResult.ConfidenceMap);
             ConfidenceMapBitmap = BitmapHelper.ToBitmapSource(result.DepthResult.ConfidenceMap);
+            InvalidRegionBitmap = BitmapHelper.ToInvalidRegionBitmap(result.DepthResult.ConfidenceMap);
             MotionMapBitmap = BitmapHelper.ToBitmapSource(result.MotionResult?.MotionMap);
             ArtifactMapBitmap = BitmapHelper.ToBitmapSource(result.ArtifactMap?.ArtifactMask);
 
@@ -613,7 +693,7 @@ public sealed class MainViewModel : ViewModelBase
         ShadowClippingText = $"{hist.ShadowClippingPercent:F1}%";
         HighlightClippingText = $"{hist.HighlightClippingPercent:F1}%";
 
-        if (SelectedViewTab == 0 || SelectedViewTab == 6)
+        if (SelectedViewTab == 0 || SelectedViewTab == 1)
         {
             UpdateDisplayBitmap();
         }
@@ -646,7 +726,7 @@ public sealed class MainViewModel : ViewModelBase
 
     private void UpdateDisplayBitmap()
     {
-        if (SelectedViewTab == 6)
+        if (SelectedViewTab == 1)
         {
             // Split A/B Comparison: Fused (Left) vs Selected Source Frame (Right)
             if (_postProcessedBuffer != null && SelectedFrame != null && File.Exists(SelectedFrame.FilePath))
@@ -664,11 +744,13 @@ public sealed class MainViewModel : ViewModelBase
         DisplayBitmap = SelectedViewTab switch
         {
             0 => FusedBitmap,
-            1 => DepthMapBitmap,
-            2 => ConfidenceMapBitmap,
-            3 => MotionMapBitmap,
-            4 => ArtifactMapBitmap,
-            5 => SelectedFrame != null && File.Exists(SelectedFrame.FilePath) ? new BitmapImage(new Uri(SelectedFrame.FilePath, UriKind.Absolute)) : null,
+            1 => FusedBitmap,
+            2 => TurboDepthBitmap,
+            3 => ConfidenceMapBitmap,
+            4 => InvalidRegionBitmap,
+            5 => MotionMapBitmap,
+            6 => ArtifactMapBitmap,
+            7 => SelectedFrame != null && File.Exists(SelectedFrame.FilePath) ? new BitmapImage(new Uri(SelectedFrame.FilePath, UriKind.Absolute)) : null,
             _ => FusedBitmap
         };
     }
