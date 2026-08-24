@@ -106,6 +106,7 @@ public sealed class StackService : IStackService
                 settings.EnableFocusBreathingCorrection,
                 settings.EnableLocalAlignment,
                 settings.LocalAlignmentGridSize,
+                settings.LensDistortion,
                 progress);
             sw.Stop();
             benchmark.AlignmentTimeMs = sw.Elapsed.TotalMilliseconds;

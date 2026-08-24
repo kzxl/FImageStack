@@ -45,16 +45,24 @@ public interface IAlignmentEngine
         bool correctFocusBreathing = true,
         bool enableLocalAlignment = false,
         int localGridSize = 8,
+        LensDistortionParams lensDistortion = default,
         IProgress<StackProgress>? progress = null);
 }
 
 public sealed class AdvancedAlignmentEngine : IAlignmentEngine
 {
     private readonly IFocusBreathingEstimator _focusBreathingEstimator;
+    private readonly ILensDistortionCorrector _lensCorrector;
+    private readonly IHomographyEstimator _homographyEstimator;
 
-    public AdvancedAlignmentEngine(IFocusBreathingEstimator? focusBreathingEstimator = null)
+    public AdvancedAlignmentEngine(
+        IFocusBreathingEstimator? focusBreathingEstimator = null,
+        ILensDistortionCorrector? lensCorrector = null,
+        IHomographyEstimator? homographyEstimator = null)
     {
         _focusBreathingEstimator = focusBreathingEstimator ?? new FocusBreathingEstimator();
+        _lensCorrector = lensCorrector ?? new LensDistortionCorrector();
+        _homographyEstimator = homographyEstimator ?? new HomographyEstimator();
     }
 
     public unsafe void AlignStack(
@@ -63,6 +71,7 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
         bool correctFocusBreathing = true,
         bool enableLocalAlignment = false,
         int localGridSize = 8,
+        LensDistortionParams lensDistortion = default,
         IProgress<StackProgress>? progress = null)
     {
         if (frames == null || frames.Count <= 1 || mode == AlignmentMode.None) return;
@@ -73,11 +82,21 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
         int width = refFrame.Width;
         int height = refFrame.Height;
 
-        // Stage 0: Global Focus Breathing Scale Curve Estimation
+        // Stage 1: Lens Distortion Correction (Brown-Conrady: Radial k1/k2 + Tangential p1/p2)
+        if (lensDistortion.HasDistortion)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                _lensCorrector.UndistortFrame(frames[i], lensDistortion);
+            }
+            progress?.Report(new StackProgress("Auto Alignment", 5.0, $"Lens Distortion corrected (k1:{lensDistortion.K1:F3}, p1:{lensDistortion.P1:F3})"));
+        }
+
+        // Stage 2: Focus Breathing Scale Curve Estimation
         if (correctFocusBreathing && (mode == AlignmentMode.Similarity || mode == AlignmentMode.Affine || mode == AlignmentMode.Homography))
         {
             var breathingResult = _focusBreathingEstimator.EstimateScaleCurve(frames, refIndex);
-            progress?.Report(new StackProgress("Auto Alignment", 5.0, $"Focus Breathing Curve: ΔM={breathingResult.TotalMagnificationShiftPercentage:+0.00;-0.00}%, R²={breathingResult.R2:F2}"));
+            progress?.Report(new StackProgress("Auto Alignment", 10.0, $"Focus Breathing Curve: ΔM={breathingResult.TotalMagnificationShiftPercentage:+0.00;-0.00}%, R²={breathingResult.R2:F2}"));
         }
 
         for (int i = 0; i < count; i++)
@@ -91,25 +110,98 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
 
             var targetFrame = frames[i];
 
-            // 1. Stage 1: Global Alignment with Breathing Scale Compensation
-            var transform = EstimateTransform(refFrame, targetFrame, mode, correctFocusBreathing);
-
-            if (MathF.Abs(transform.Dx) > 0.05f || MathF.Abs(transform.Dy) > 0.05f ||
-                MathF.Abs(transform.RotationAngle) > 0.001f || MathF.Abs(transform.ScaleX - 1.0f) > 0.001f)
+            // Stage 3: Global Alignment (Perspective Homography vs Subpixel Similarity/Affine)
+            if (mode == AlignmentMode.Homography)
             {
-                ApplySubpixelWarp(targetFrame, transform);
+                var matches = FindPointCorrespondences(refFrame, targetFrame);
+                var h = _homographyEstimator.EstimateHomography(matches);
+                _homographyEstimator.ApplyHomographyWarp(targetFrame, h);
+                targetFrame.AlignmentHomography = (float[])h.Clone();
+            }
+            else
+            {
+                var transform = EstimateTransform(refFrame, targetFrame, mode, correctFocusBreathing);
+                if (MathF.Abs(transform.Dx) > 0.05f || MathF.Abs(transform.Dy) > 0.05f ||
+                    MathF.Abs(transform.RotationAngle) > 0.001f || MathF.Abs(transform.ScaleX - 1.0f) > 0.001f)
+                {
+                    ApplySubpixelWarp(targetFrame, transform);
+                }
             }
 
-            // 2. Stage 2: Local Elastic Non-Rigid Mesh Alignment (Macro 1:1 Parallax Compensation)
+            // Stage 4: Local Elastic Non-Rigid Mesh Alignment (Macro 1:1 Parallax Compensation)
             if (enableLocalAlignment && localGridSize >= 4)
             {
                 var localMesh = EstimateLocalElasticMesh(refFrame, targetFrame, localGridSize, localGridSize);
                 ApplyLocalElasticWarp(targetFrame, localMesh);
             }
 
-            targetFrame.AlignmentConfidence = transform.Confidence;
-            progress?.Report(new StackProgress("Auto Alignment", (double)(i + 1) / count * 100, $"Aligned frame #{i + 1} ({mode}, dx:{transform.Dx:F1}, dy:{transform.Dy:F1}{(correctFocusBreathing ? $", scale:{transform.ScaleX * 100f:F1}%" : "")}{(enableLocalAlignment ? ", Local Mesh" : "")})"));
+            targetFrame.AlignmentConfidence = 0.95;
+            progress?.Report(new StackProgress("Auto Alignment", (double)(i + 1) / count * 100, $"Aligned frame #{i + 1} ({mode}{(correctFocusBreathing ? $", scale:{targetFrame.FocusBreathingScale * 100f:F1}%" : "")}{(enableLocalAlignment ? ", Local Mesh" : "")})"));
         }
+    }
+
+    private static unsafe List<(float srcX, float srcY, float dstX, float dstY)> FindPointCorrespondences(
+        StackFrame refFrame,
+        StackFrame targetFrame)
+    {
+        int w = refFrame.Width;
+        int h = refFrame.Height;
+        float* refGray = refFrame.GrayBuffer!.DataPointer;
+        float* tgtGray = targetFrame.GrayBuffer!.DataPointer;
+
+        int patchSize = 24;
+        int searchRadius = 12;
+        var gridPoints = new (int x, int y)[]
+        {
+            (w / 4, h / 4),     (w / 2, h / 4),     (w * 3 / 4, h / 4),
+            (w / 4, h / 2),     (w / 2, h / 2),     (w * 3 / 4, h / 2),
+            (w / 4, h * 3 / 4), (w / 2, h * 3 / 4), (w * 3 / 4, h * 3 / 4)
+        };
+
+        var matches = new List<(float srcX, float srcY, float dstX, float dstY)>();
+
+        foreach (var (cx, cy) in gridPoints)
+        {
+            float bestScore = float.MaxValue;
+            int bestDx = 0, bestDy = 0;
+
+            for (int dy = -searchRadius; dy <= searchRadius; dy++)
+            {
+                for (int dx = -searchRadius; dx <= searchRadius; dx++)
+                {
+                    float sumDiff = 0f;
+                    int validSamples = 0;
+
+                    for (int py = -patchSize / 2; py < patchSize / 2; py += 2)
+                    {
+                        int ry = cy + py;
+                        int ty = cy + py + dy;
+                        if (ry < 0 || ry >= h || ty < 0 || ty >= h) continue;
+
+                        for (int px = -patchSize / 2; px < patchSize / 2; px += 2)
+                        {
+                            int rx = cx + px;
+                            int tx = cx + px + dx;
+                            if (rx < 0 || rx >= w || tx < 0 || tx >= w) continue;
+
+                            sumDiff += MathF.Abs(refGray[ry * w + rx] - tgtGray[ty * w + tx]);
+                            validSamples++;
+                        }
+                    }
+
+                    if (validSamples > 0 && sumDiff < bestScore)
+                    {
+                        bestScore = sumDiff;
+                        bestDx = dx;
+                        bestDy = dy;
+                    }
+                }
+            }
+
+            matches.Add((cx, cy, cx + bestDx, cy + bestDy));
+        }
+
+        return matches;
     }
 
     private static unsafe AlignmentTransform EstimateTransform(

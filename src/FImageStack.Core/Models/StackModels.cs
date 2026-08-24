@@ -33,6 +33,7 @@ public sealed class StackFrame : IDisposable
     public double AlignmentConfidence { get; set; } = 1.0;
     public float PriorityWeight { get; set; } = 1.0f;
     public float FocusBreathingScale { get; set; } = 1.0f;
+    public float[]? AlignmentHomography { get; set; }
 
     public void Dispose()
     {
@@ -134,6 +135,7 @@ public sealed class FusionSettings
     public bool EnableEdgeReconstruction { get; set; } = true;
     public bool EnableTiledProcessing { get; set; } = false;
     public int TileSize { get; set; } = 512;
+    public Alignment.LensDistortionParams LensDistortion { get; set; } = default;
 
     public ResolutionMode RenderMode { get; set; } = ResolutionMode.FastPreview1280;
     public int PreviewMaxDimension { get; set; } = 1280;
