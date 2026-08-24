@@ -39,6 +39,7 @@ public sealed class StackService : IStackService
     private readonly ITemporalDenoiseEngine _temporalDenoiseEngine;
     private readonly IMultiFrameSuperResolutionEngine _superResolutionEngine;
     private readonly IOptimalFrameRangeSelector _optimalRangeSelector;
+    private readonly IStackSimulationEngine _simulationEngine;
 
     public StackService(
         IImageIO imageIO,
@@ -52,7 +53,8 @@ public sealed class StackService : IStackService
         ITiledProcessor? tiledProcessor = null,
         ITemporalDenoiseEngine? temporalDenoiseEngine = null,
         IMultiFrameSuperResolutionEngine? superResolutionEngine = null,
-        IOptimalFrameRangeSelector? optimalRangeSelector = null)
+        IOptimalFrameRangeSelector? optimalRangeSelector = null,
+        IStackSimulationEngine? simulationEngine = null)
     {
         _imageIO = imageIO;
         _alignmentEngine = alignmentEngine ?? new AdvancedAlignmentEngine();
@@ -66,6 +68,7 @@ public sealed class StackService : IStackService
         _temporalDenoiseEngine = temporalDenoiseEngine ?? new TemporalDenoiseEngine();
         _superResolutionEngine = superResolutionEngine ?? new MultiFrameSuperResolutionEngine();
         _optimalRangeSelector = optimalRangeSelector ?? new OptimalFrameRangeSelector();
+        _simulationEngine = simulationEngine ?? new StackSimulationEngine();
     }
 
     public async Task<ProcessedStackResult> ProcessStackAsync(
@@ -132,6 +135,14 @@ public sealed class StackService : IStackService
                     }
                     frames = selectedFrames;
                 }
+            }
+
+            // 1.8 Stack Depth Simulation (Focus Gap Analysis)
+            if (settings.EnableStackSimulation && frames.Count >= 2)
+            {
+                progress?.Report(new StackProgress("Stack Simulation", 0, "Simulating continuous depth coverage..."));
+                result.SimulationResult = _simulationEngine.SimulateDepthCoverage(frames);
+                progress?.Report(new StackProgress("Stack Simulation", 100, $"{result.SimulationResult.CoverageBarAscii} | {result.SimulationResult.Recommendation}"));
             }
 
             // 2. Alignment & Sub-Pixel Warp

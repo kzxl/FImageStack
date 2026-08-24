@@ -141,6 +141,7 @@ public sealed class FusionSettings
     public bool EnableSuperResolution { get; set; } = false;
     public SuperResolution.SuperResolutionParams SuperResolutionParams { get; set; } = new();
     public bool EnableAutoFrameSelection { get; set; } = false;
+    public bool EnableStackSimulation { get; set; } = true;
 
     public ResolutionMode RenderMode { get; set; } = ResolutionMode.FastPreview1280;
     public int PreviewMaxDimension { get; set; } = 1280;
@@ -198,6 +199,7 @@ public sealed class ProcessedStackResult : IDisposable
     public MotionDetectionResult? MotionResult { get; set; }
     public ArtifactMap? ArtifactMap { get; set; }
     public Quality.StackQualityReport? QualityReport { get; set; }
+    public Quality.StackSimulationResult? SimulationResult { get; set; }
     public RepairReport? RepairReport { get; set; }
     public BenchmarkReport Benchmark { get; set; } = null!;
 
