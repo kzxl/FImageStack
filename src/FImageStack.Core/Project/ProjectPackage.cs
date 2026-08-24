@@ -1,18 +1,9 @@
 using FImageStack.Core.Models;
+using FImageStack.Core.PostProcessing;
 using FImageStack.Core.Quality;
 using FImageStack.Core.Retouch;
 
 namespace FImageStack.Core.Project;
-
-public sealed class PostProcessSettings
-{
-    public float Exposure { get; set; } = 0.0f;
-    public float Contrast { get; set; } = 1.0f;
-    public float Clarity { get; set; } = 0.0f;
-    public float Sharpening { get; set; } = 0.3f;
-    public float Saturation { get; set; } = 1.0f;
-    public ToneMappingOperator ToneMapping { get; set; } = ToneMappingOperator.ACESFilmic;
-}
 
 public sealed class RetouchStrokeData
 {

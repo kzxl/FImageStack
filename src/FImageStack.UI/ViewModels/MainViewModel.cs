@@ -948,7 +948,7 @@ public sealed class MainViewModel : ViewModelBase
                         Exposure = ExposureCompensation,
                         Contrast = ContrastAdjustment,
                         Clarity = ClarityAdjustment,
-                        Sharpening = SharpeningAdjustment,
+                        SharpenAmount = SharpeningAdjustment,
                         Saturation = SaturationAdjustment,
                         ToneMapping = SelectedToneMapping
                     }
@@ -988,11 +988,7 @@ public sealed class MainViewModel : ViewModelBase
                 {
                     if (File.Exists(path))
                     {
-                        Frames.Add(new FrameItemViewModel
-                        {
-                            Index = idx++,
-                            FilePath = path
-                        });
+                        Frames.Add(new FrameItemViewModel(path, idx++));
                     }
                 }
 
@@ -1015,7 +1011,7 @@ public sealed class MainViewModel : ViewModelBase
                 ExposureCompensation = loaded.Project.PostProcess.Exposure;
                 ContrastAdjustment = loaded.Project.PostProcess.Contrast;
                 ClarityAdjustment = loaded.Project.PostProcess.Clarity;
-                SharpeningAdjustment = loaded.Project.PostProcess.Sharpening;
+                SharpeningAdjustment = loaded.Project.PostProcess.SharpenAmount;
                 SaturationAdjustment = loaded.Project.PostProcess.Saturation;
                 SelectedToneMapping = loaded.Project.PostProcess.ToneMapping;
 
