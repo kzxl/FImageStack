@@ -200,6 +200,7 @@ public sealed class ProcessedStackResult : IDisposable
     public ArtifactMap? ArtifactMap { get; set; }
     public Quality.StackQualityReport? QualityReport { get; set; }
     public Quality.StackSimulationResult? SimulationResult { get; set; }
+    public Quality.FocusGapAnalysisReport? FocusGapReport { get; set; }
     public RepairReport? RepairReport { get; set; }
     public BenchmarkReport Benchmark { get; set; } = null!;
 

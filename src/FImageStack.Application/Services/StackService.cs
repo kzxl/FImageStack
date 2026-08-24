@@ -40,6 +40,7 @@ public sealed class StackService : IStackService
     private readonly IMultiFrameSuperResolutionEngine _superResolutionEngine;
     private readonly IOptimalFrameRangeSelector _optimalRangeSelector;
     private readonly IStackSimulationEngine _simulationEngine;
+    private readonly IFocusGapDetector _focusGapDetector;
 
     public StackService(
         IImageIO imageIO,
@@ -54,7 +55,8 @@ public sealed class StackService : IStackService
         ITemporalDenoiseEngine? temporalDenoiseEngine = null,
         IMultiFrameSuperResolutionEngine? superResolutionEngine = null,
         IOptimalFrameRangeSelector? optimalRangeSelector = null,
-        IStackSimulationEngine? simulationEngine = null)
+        IStackSimulationEngine? simulationEngine = null,
+        IFocusGapDetector? focusGapDetector = null)
     {
         _imageIO = imageIO;
         _alignmentEngine = alignmentEngine ?? new AdvancedAlignmentEngine();
@@ -69,6 +71,7 @@ public sealed class StackService : IStackService
         _superResolutionEngine = superResolutionEngine ?? new MultiFrameSuperResolutionEngine();
         _optimalRangeSelector = optimalRangeSelector ?? new OptimalFrameRangeSelector();
         _simulationEngine = simulationEngine ?? new StackSimulationEngine();
+        _focusGapDetector = focusGapDetector ?? new FocusGapDetector();
     }
 
     public async Task<ProcessedStackResult> ProcessStackAsync(
@@ -205,6 +208,16 @@ public sealed class StackService : IStackService
 
             sw.Stop();
             benchmark.FocusMeasureTimeMs = sw.Elapsed.TotalMilliseconds;
+
+            // 4.5 Inter-Frame Focus Gap Detection
+            if (frames.Count >= 2)
+            {
+                result.FocusGapReport = _focusGapDetector.DetectInterFrameGaps(frames);
+                if (result.FocusGapReport.HasLargeGaps)
+                {
+                    progress?.Report(new StackProgress("Focus Gap Analysis", 100, result.FocusGapReport.Summary));
+                }
+            }
 
             // 5. Depth Map Estimation
             cancellationToken.ThrowIfCancellationRequested();
