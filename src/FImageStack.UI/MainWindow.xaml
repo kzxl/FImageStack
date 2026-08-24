@@ -351,10 +351,10 @@
                                 <StackPanel Visibility="{Binding EnableTiledProcessing, Converter={StaticResource BoolToVis}}" Margin="20,4,0,0">
                                     <TextBlock Text="Tile Grid Block Size:" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2" />
                                     <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding TileSize}" Margin="0,0,0,4">
-                                        <ComboBoxItem Content="4096 × 4096 (Gigapixel 100MP+)" Tag="{sys:Int32 4096}" IsSelected="True" />
-                                        <ComboBoxItem Content="2048 × 2048 (Balanced 50MP)" Tag="{sys:Int32 2048}" />
-                                        <ComboBoxItem Content="1024 × 1024 (Low-RAM 16GB)" Tag="{sys:Int32 1024}" />
-                                        <ComboBoxItem Content="512 × 512 (Micro-Bounded 8GB)" Tag="{sys:Int32 512}" />
+                                        <ComboBoxItem Content="4096 × 4096 (Gigapixel 100MP+)" Tag="4096" IsSelected="True" />
+                                        <ComboBoxItem Content="2048 × 2048 (Balanced 50MP)" Tag="2048" />
+                                        <ComboBoxItem Content="1024 × 1024 (Low-RAM 16GB)" Tag="1024" />
+                                        <ComboBoxItem Content="512 × 512 (Micro-Bounded 8GB)" Tag="512" />
                                     </ComboBox>
                                 </StackPanel>
                             </StackPanel>

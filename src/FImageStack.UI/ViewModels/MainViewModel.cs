@@ -516,16 +516,15 @@ public sealed class MainViewModel : ViewModelBase
         set => SetProperty(ref _enableEdgeReconstruction, value);
     }
 
-    public bool EnableTiledProcessing
-    {
-        get => _enableTiledProcessing;
-        set => SetProperty(ref _enableTiledProcessing, value);
-    }
-
-    public int TileSize
+    public bool EnableTiledProcessing { get => _enableTiledProcessing; set => SetProperty(ref _enableTiledProcessing, value); }
+    public object TileSize
     {
         get => _tileSize;
-        set => SetProperty(ref _tileSize, value);
+        set
+        {
+            if (value is int i) SetProperty(ref _tileSize, i);
+            else if (value is string s && int.TryParse(s, out int parsed)) SetProperty(ref _tileSize, parsed);
+        }
     }
 
     // Metrics properties
