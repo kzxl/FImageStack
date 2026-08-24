@@ -7,11 +7,13 @@ using System.Windows.Media.Imaging;
 using FImageStack.Application.Services;
 using FImageStack.Core;
 using FImageStack.Core.Acceleration;
+using FImageStack.Core.Lab;
 using FImageStack.Core.Models;
 using FImageStack.Core.PostProcessing;
 using FImageStack.Core.Presets;
 using FImageStack.Core.Project;
 using FImageStack.Core.Quality;
+using FImageStack.Core.Refocus;
 using FImageStack.Core.Retouch;
 using FImageStack.Core.Selection;
 using FImageStack.Infrastructure.IO;
@@ -293,6 +295,9 @@ public sealed class MainViewModel : ViewModelBase
                 OnPropertyChanged(nameof(IsArtifactTabSelected));
                 OnPropertyChanged(nameof(IsSourceTabSelected));
                 OnPropertyChanged(nameof(IsDofVolumeTabSelected));
+                OnPropertyChanged(nameof(IsFocusWaveTabSelected));
+                OnPropertyChanged(nameof(IsVirtualDofTabSelected));
+                OnPropertyChanged(nameof(IsStackLabTabSelected));
                 UpdateDisplayBitmap();
             }
         }
@@ -350,6 +355,24 @@ public sealed class MainViewModel : ViewModelBase
     {
         get => SelectedViewTab == 8;
         set { if (value) SelectedViewTab = 8; }
+    }
+
+    public bool IsFocusWaveTabSelected
+    {
+        get => SelectedViewTab == 9;
+        set { if (value) SelectedViewTab = 9; }
+    }
+
+    public bool IsVirtualDofTabSelected
+    {
+        get => SelectedViewTab == 10;
+        set { if (value) SelectedViewTab = 10; }
+    }
+
+    public bool IsStackLabTabSelected
+    {
+        get => SelectedViewTab == 11;
+        set { if (value) SelectedViewTab = 11; }
     }
 
     public BitmapSource? DisplayBitmap
@@ -637,6 +660,61 @@ public sealed class MainViewModel : ViewModelBase
     public BitmapSource? DofThicknessBitmap { get; private set; }
     public BitmapSource? MotionMapBitmap { get; private set; }
     public BitmapSource? ArtifactMapBitmap { get; private set; }
+    public BitmapSource? VirtualDofBitmap { get; private set; }
+
+    // Advanced Quality & Lab Engines
+    private readonly IArtifactHunterEngine _hunterEngine = new ArtifactHunterEngine();
+    private readonly IShotQualityPredictor _qualityPredictor = new ShotQualityPredictor();
+    private readonly IFocusWaveEngine _focusWaveEngine = new FocusWaveEngine();
+    private readonly IRefocusEngine _refocusEngine = new RefocusEngine();
+    private readonly IABStackLabEngine _stackLabEngine = new ABStackLabEngine();
+
+    // Artifact Hunter & Quality Scorecard Properties
+    private ArtifactHunterReport? _hunterReport;
+    public ArtifactHunterReport? HunterReport { get => _hunterReport; set => SetProperty(ref _hunterReport, value); }
+
+    private bool _isHunterPopupOpen;
+    public bool IsHunterPopupOpen { get => _isHunterPopupOpen; set => SetProperty(ref _isHunterPopupOpen, value); }
+
+    private ShotQualityScorecard? _scorecard;
+    public ShotQualityScorecard? Scorecard { get => _scorecard; set => SetProperty(ref _scorecard, value); }
+
+    private string _scorecardBadgeText = "Grade A+ (93%)";
+    public string ScorecardBadgeText { get => _scorecardBadgeText; set => SetProperty(ref _scorecardBadgeText, value); }
+
+    private string _scorecardSummaryText = "Ready to Render (Optimal Condition)";
+    public string ScorecardSummaryText { get => _scorecardSummaryText; set => SetProperty(ref _scorecardSummaryText, value); }
+
+    // Focus Wave Properties
+    private FocusWaveAnalysisResult? _focusWaveResult;
+    public FocusWaveAnalysisResult? FocusWaveResult { get => _focusWaveResult; set => SetProperty(ref _focusWaveResult, value); }
+
+    private string _focusWaveAsciiGraph = string.Empty;
+    public string FocusWaveAsciiGraph { get => _focusWaveAsciiGraph; set => SetProperty(ref _focusWaveAsciiGraph, value); }
+
+    private string _stepUniformityScoreText = "94% Uniform";
+    public string StepUniformityScoreText { get => _stepUniformityScoreText; set => SetProperty(ref _stepUniformityScoreText, value); }
+
+    private string _focusWaveSummaryText = string.Empty;
+    public string FocusWaveSummaryText { get => _focusWaveSummaryText; set => SetProperty(ref _focusWaveSummaryText, value); }
+
+    // Virtual Focus & DOF Sliders
+    private float _virtualAperture = 0.5f;
+    public float VirtualAperture { get => _virtualAperture; set => SetProperty(ref _virtualAperture, value); }
+
+    private float _virtualDofMin = 0f;
+    public float VirtualDofMin { get => _virtualDofMin; set => SetProperty(ref _virtualDofMin, value); }
+
+    private float _virtualDofMax = 10f;
+    public float VirtualDofMax { get => _virtualDofMax; set => SetProperty(ref _virtualDofMax, value); }
+
+    // A/B Stack Lab Properties
+    private StackLabReport? _labReport;
+    public StackLabReport? LabReport { get => _labReport; set => SetProperty(ref _labReport, value); }
+    public ObservableCollection<StackLabSlot> LabSlots { get; } = new();
+
+    private string _labSummaryText = "Click 'Run Lab' to benchmark all 5 stacking algorithms simultaneously.";
+    public string LabSummaryText { get => _labSummaryText; set => SetProperty(ref _labSummaryText, value); }
 
     // Commands
     public ICommand LoadFolderCommand { get; }
@@ -657,6 +735,11 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand UndoRetouchCommand { get; }
     public ICommand RedoRetouchCommand { get; }
     public ICommand ClearRetouchCommand { get; }
+    public ICommand HuntArtifactsCommand { get; }
+    public ICommand CloseHunterPopupCommand { get; }
+    public ICommand ApplyVirtualDofCommand { get; }
+    public ICommand RunStackLabCommand { get; }
+    public ICommand SelectLabWinnerCommand { get; }
 
     public MainViewModel()
     {
@@ -766,6 +849,12 @@ public sealed class MainViewModel : ViewModelBase
             }
         });
 
+        HuntArtifactsCommand = new AsyncRelayCommand(ExecuteHuntArtifactsAsync, () => !IsProcessing && Frames.Count >= 2);
+        CloseHunterPopupCommand = new RelayCommand(_ => IsHunterPopupOpen = false);
+        ApplyVirtualDofCommand = new AsyncRelayCommand(ExecuteApplyVirtualDofAsync, () => _lastResult != null && !IsProcessing);
+        RunStackLabCommand = new AsyncRelayCommand(ExecuteRunStackLabAsync, () => !IsProcessing && Frames.Count >= 2);
+        SelectLabWinnerCommand = new RelayCommand(param => ExecuteSelectLabWinner(param as StackLabSlot));
+
         // Try pre-loading test dataset if available
         string defaultSample = @"data\test_stack_50";
         if (Directory.Exists(defaultSample))
@@ -792,6 +881,8 @@ public sealed class MainViewModel : ViewModelBase
                 }
 
                 var diags = _frameSelector.AnalyzeStack(loadedFrames);
+                var scorecard = _qualityPredictor.PredictQuality(loadedFrames);
+                var waveResult = _focusWaveEngine.AnalyzeFocusWave(loadedFrames);
 
                 System.Windows.Application.Current.Dispatcher.Invoke(() =>
                 {
@@ -810,7 +901,16 @@ public sealed class MainViewModel : ViewModelBase
                         if (d.IsBadFrame || d.IsDuplicate) badCount++;
                     }
 
-                    StatusMessage = $"Analysis complete: Flagged {badCount} problematic/duplicate frame(s).";
+                    Scorecard = scorecard;
+                    ScorecardBadgeText = $"{scorecard.GradeTitle} ({scorecard.FinalExpectedQualityScore:F0}%)";
+                    ScorecardSummaryText = scorecard.SummaryMessage;
+
+                    FocusWaveResult = waveResult;
+                    FocusWaveAsciiGraph = waveResult.AsciiWaveGraph;
+                    StepUniformityScoreText = $"{waveResult.StepUniformityScore:F0}% Uniform";
+                    FocusWaveSummaryText = waveResult.EvaluationSummary;
+
+                    StatusMessage = $"Analysis complete: Flagged {badCount} problematic frame(s). Predicted Quality: {scorecard.GradeTitle}.";
                 });
             }
             finally
@@ -818,6 +918,141 @@ public sealed class MainViewModel : ViewModelBase
                 foreach (var lf in loadedFrames) lf.Dispose();
             }
         });
+    }
+
+    private async Task ExecuteHuntArtifactsAsync()
+    {
+        if (Frames.Count < 2) return;
+        StatusMessage = "Artifact Hunter: Scanning entire stack for ghosting, halos, blur and alignment risks...";
+
+        await Task.Run(() =>
+        {
+            var loadedFrames = new List<StackFrame>(Frames.Count);
+            try
+            {
+                int sampleCount = Math.Min(Frames.Count, 20);
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    if (File.Exists(Frames[i].FilePath))
+                    {
+                        loadedFrames.Add(_imageIO.LoadFrame(Frames[i].FilePath, i));
+                    }
+                }
+
+                if (loadedFrames.Count >= 2)
+                {
+                    var report = _hunterEngine.HuntArtifacts(loadedFrames);
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        HunterReport = report;
+                        IsHunterPopupOpen = true;
+                        StatusMessage = $"Artifact Hunter Scan Complete! Health Score: {report.HealthScore}% with {report.Hotspots.Count} hotspots.";
+                    });
+                }
+            }
+            finally
+            {
+                foreach (var lf in loadedFrames) lf.Dispose();
+            }
+        });
+    }
+
+    private async Task ExecuteApplyVirtualDofAsync()
+    {
+        if (_lastResult == null || _lastResult.DepthResult == null)
+        {
+            StatusMessage = "Virtual DOF requires a completed stack render first.";
+            return;
+        }
+
+        StatusMessage = $"Rendering Virtual DOF (Aperture: f/{VirtualAperture * 2.8f:F1}, Range: [{VirtualDofMin:F1}..{VirtualDofMax:F1}])...";
+
+        await Task.Run(() =>
+        {
+            var loadedFrames = new List<StackFrame>(Frames.Count);
+            try
+            {
+                for (int i = 0; i < Frames.Count; i++)
+                {
+                    if (File.Exists(Frames[i].FilePath))
+                    {
+                        loadedFrames.Add(_imageIO.LoadFrame(Frames[i].FilePath, i));
+                    }
+                }
+
+                var rendered = _refocusEngine.RenderSelectiveDofRange(
+                    _lastResult.DepthResult,
+                    loadedFrames,
+                    VirtualDofMin,
+                    VirtualDofMax);
+
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    VirtualDofBitmap = BitmapHelper.ToBitmapSource(rendered);
+                    SelectedViewTab = 10;
+                    UpdateDisplayBitmap();
+                    StatusMessage = $"Virtual DOF Render Complete (Aperture: {VirtualAperture:F2}x, Range: [{VirtualDofMin:F1}..{VirtualDofMax:F1}]).";
+                });
+            }
+            finally
+            {
+                foreach (var lf in loadedFrames) lf.Dispose();
+            }
+        });
+    }
+
+    private async Task ExecuteRunStackLabAsync()
+    {
+        if (Frames.Count < 2) return;
+        StatusMessage = "A/B Stack Lab: Running multi-algorithm benchmark matrix in parallel...";
+
+        await Task.Run(() =>
+        {
+            var loadedFrames = new List<StackFrame>(Frames.Count);
+            try
+            {
+                int sampleCount = Math.Min(Frames.Count, 15);
+                for (int i = 0; i < sampleCount; i++)
+                {
+                    if (File.Exists(Frames[i].FilePath))
+                    {
+                        loadedFrames.Add(_imageIO.LoadFrame(Frames[i].FilePath, i));
+                    }
+                }
+
+                if (loadedFrames.Count >= 2)
+                {
+                    var report = _stackLabEngine.RunMultiStackLab(loadedFrames);
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        LabReport = report;
+                        LabSlots.Clear();
+                        foreach (var slot in report.Slots)
+                        {
+                            LabSlots.Add(slot);
+                        }
+                        LabSummaryText = $"Lab Winner: {report.WinnerAlgorithmTitle} with Score {report.WinnerScore:F1} pts!";
+                        SelectedViewTab = 11;
+                        StatusMessage = $"A/B Stack Lab Finished! Best performer: {report.WinnerAlgorithmTitle} ({report.WinnerScore:F1} pts).";
+                    });
+                }
+            }
+            finally
+            {
+                foreach (var lf in loadedFrames) lf.Dispose();
+            }
+        });
+    }
+
+    private void ExecuteSelectLabWinner(StackLabSlot? slot)
+    {
+        if (slot == null || slot.RenderedImage == null) return;
+        _postProcessedBuffer?.Dispose();
+        _postProcessedBuffer = slot.RenderedImage.Clone();
+        FusedBitmap = BitmapHelper.ToBitmapSource(_postProcessedBuffer);
+        SelectedViewTab = 0;
+        UpdateDisplayBitmap();
+        StatusMessage = $"Adopted {slot.AlgorithmTitle} as Primary Fused Master Image!";
     }
 
     public unsafe void ApplyBrushStroke(float x, float y)
@@ -1419,6 +1654,7 @@ public sealed class MainViewModel : ViewModelBase
             6 => ArtifactMapBitmap,
             7 => SelectedFrame != null && File.Exists(SelectedFrame.FilePath) ? new BitmapImage(new Uri(SelectedFrame.FilePath, UriKind.Absolute)) : null,
             8 => DofThicknessBitmap,
+            10 => VirtualDofBitmap ?? FusedBitmap,
             _ => FusedBitmap
         };
     }

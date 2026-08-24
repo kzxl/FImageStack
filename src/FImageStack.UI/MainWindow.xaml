@@ -45,8 +45,19 @@
                     </Border>
                 </StackPanel>
 
-                <!-- Quick Load Sample Stacks -->
+                <!-- Quick Load Sample Stacks & Diagnostic Actions -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Pre-Render Scorecard Badge -->
+                    <Border Background="#0F172A" BorderBrush="#22C55E" BorderThickness="1" CornerRadius="4" Margin="0,0,8,0" Padding="8,4" ToolTip="{Binding ScorecardSummaryText}">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="📋 " FontSize="11" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding ScorecardBadgeText}" FontWeight="Bold" FontSize="11" Foreground="#22C55E" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Pre-Stack Diagnostic Hunter Button -->
+                    <Button Content="🎯 Hunt Artifacts" Style="{StaticResource ModernButton}" Command="{Binding HuntArtifactsCommand}" Background="#3B0764" BorderBrush="#A855F7" Foreground="#F3E8FF" FontWeight="Bold" Margin="0,0,10,0" Padding="12,6" ToolTip="Pre-stack diagnostic scan in 1s for ghosting, halos, blur, and motion" />
+
                     <TextBlock Text="Quick Samples:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" VerticalAlignment="Center" Margin="0,0,8,0" />
                     <Button Content="20 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="20" Margin="0,0,6,0" Padding="10,5" />
                     <Button Content="50 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="50" Margin="0,0,6,0" Padding="10,5" />
@@ -172,6 +183,9 @@
                                 <RadioButton Content="🍃 Motion Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsMotionTabSelected}" GroupName="ViewTabs" />
                                 <RadioButton Content="🌐 DOF Volume Map" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsDofVolumeTabSelected}" GroupName="ViewTabs" ToolTip="Focus Volume Depth-of-Field thickness and focus coverage map" />
                                 <RadioButton Content="🛡️ Artifacts &amp; Repair" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsArtifactTabSelected}" GroupName="ViewTabs" />
+                                <RadioButton Content="🌊 Focus Wave" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsFocusWaveTabSelected}" GroupName="ViewTabs" ToolTip="2D Spatio-Temporal Focus Wave Graph and Step Uniformity Visualizer" />
+                                <RadioButton Content="🎯 Virtual DOF" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsVirtualDofTabSelected}" GroupName="ViewTabs" ToolTip="Post-capture interactive refocus and synthetic aperture bokeh control" />
+                                <RadioButton Content="🧪 A/B Stack Lab" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsStackLabTabSelected}" GroupName="ViewTabs" ToolTip="Compare 5 stacking algorithms side-by-side with synchronized 100% zoom" />
                                 <RadioButton Content="🖼️ Source Frame" Style="{StaticResource TabRadioButton}" IsChecked="{Binding IsSourceTabSelected}" GroupName="ViewTabs" />
                             </StackPanel>
                         </ScrollViewer>
@@ -198,8 +212,52 @@
                     </Grid>
                 </Border>
 
+                <!-- Virtual DOF & Synthetic Bokeh Bar -->
+                <Border Grid.Row="1" Background="#131627" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="16,8"
+                        Visibility="{Binding IsVirtualDofTabSelected, Converter={StaticResource BoolToVis}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="140" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="120" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="Khẩu độ ảo:" Foreground="{StaticResource TextSecondary}" FontWeight="Bold" Margin="0,0,8,0" VerticalAlignment="Center" />
+                        <Slider Grid.Column="1" Minimum="0.1" Maximum="2.0" Value="{Binding VirtualAperture}" VerticalAlignment="Center" SmallChange="0.05" />
+                        
+                        <TextBlock Grid.Column="2" Text="Z-Min:" Foreground="{StaticResource TextSecondary}" FontWeight="Bold" Margin="16,0,8,0" VerticalAlignment="Center" />
+                        <Slider Grid.Column="3" Minimum="0" Maximum="30" Value="{Binding VirtualDofMin}" VerticalAlignment="Center" SmallChange="0.5" />
+
+                        <TextBlock Grid.Column="4" Text="Z-Max:" Foreground="{StaticResource TextSecondary}" FontWeight="Bold" Margin="16,0,8,0" VerticalAlignment="Center" />
+                        <Slider Grid.Column="5" Minimum="0" Maximum="50" Value="{Binding VirtualDofMax}" VerticalAlignment="Center" SmallChange="0.5" />
+
+                        <Button Grid.Column="7" Content="⚡ Re-Render Bokeh" Style="{StaticResource ModernButton}" Command="{Binding ApplyVirtualDofCommand}" Background="#0284C7" BorderBrush="#38BDF8" Foreground="#FFFFFF" FontWeight="Bold" Padding="12,4" />
+                    </Grid>
+                </Border>
+
+                <!-- A/B Stack Lab Control Bar -->
+                <Border Grid.Row="1" Background="#1B122C" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="16,8"
+                        Visibility="{Binding IsStackLabTabSelected, Converter={StaticResource BoolToVis}}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="🧪 A/B STACK LAB: " FontWeight="Bold" Foreground="{StaticResource WarningAccent}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding LabSummaryText}" Foreground="{StaticResource TextPrimary}" FontWeight="Medium" VerticalAlignment="Center" Margin="6,0,0,0" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="🚀 Run Multi-Algorithm Lab" Style="{StaticResource ModernButton}" Command="{Binding RunStackLabCommand}" Background="#4C1D95" BorderBrush="#8B5CF6" Foreground="#EDE9FE" FontWeight="Bold" Padding="14,6" />
+                    </Grid>
+                </Border>
+
                 <!-- Main Image Viewport with Inspector & Retouch Drawing -->
                 <Grid Grid.Row="2">
+                    <!-- 1. Regular Image Viewport -->
                     <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
                         <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Margin="10">
                             <!-- Image Display with Mouse Events for Retouch Painting and Pixel Inspector -->
@@ -209,6 +267,82 @@
                                    MouseDown="Image_MouseDown" />
                         </Grid>
                     </ScrollViewer>
+
+                    <!-- 2. Focus Wave Visualizer Panel -->
+                    <Border Background="#07090E" Padding="20" Visibility="{Binding IsFocusWaveTabSelected, Converter={StaticResource BoolToVis}}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                            <StackPanel>
+                                <Border Background="#0F172A" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,16">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="🌊 2D SPATIO-TEMPORAL FOCUS WAVE GRAPH" FontWeight="Bold" FontSize="14" Foreground="#38BDF8" Margin="0,0,0,6" />
+                                            <TextBlock Text="{Binding FocusWaveSummaryText}" Foreground="{StaticResource TextSecondary}" FontSize="12" />
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Background="#042F2E" BorderBrush="#14B8A6" BorderThickness="1" CornerRadius="6" Padding="12,6" VerticalAlignment="Center">
+                                            <StackPanel Orientation="Horizontal">
+                                                <TextBlock Text="Step Uniformity: " Foreground="#5EEAD4" FontSize="12" />
+                                                <TextBlock Text="{Binding StepUniformityScoreText}" FontWeight="Bold" Foreground="#2DD4BF" FontSize="13" />
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+                                </Border>
+
+                                <!-- ASCII Wave Graph Monospace Render -->
+                                <Border Background="#030712" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="16">
+                                    <TextBox Text="{Binding FocusWaveAsciiGraph, Mode=OneWay}" FontFamily="Consolas, Monospace" FontSize="12" Foreground="#4ADE80" Background="Transparent" BorderThickness="0" IsReadOnly="True" />
+                                </Border>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+
+                    <!-- 3. A/B Stack Lab Matrix Grid -->
+                    <Border Background="#07090E" Padding="16" Visibility="{Binding IsStackLabTabSelected, Converter={StaticResource BoolToVis}}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <StackPanel>
+                                <ItemsControl ItemsSource="{Binding LabSlots}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal" HorizontalAlignment="Center" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Width="380" Background="#0F172A" BorderBrush="{StaticResource BorderHover}" BorderThickness="1" CornerRadius="8" Margin="10" Padding="14">
+                                                <StackPanel>
+                                                    <Grid Margin="0,0,0,8">
+                                                        <TextBlock Text="{Binding AlgorithmTitle}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
+                                                        <Border Background="#1E293B" BorderBrush="#38BDF8" BorderThickness="1" CornerRadius="4" Padding="6,2" HorizontalAlignment="Right">
+                                                            <TextBlock Text="{Binding CompositeScore, StringFormat='Score: {0:F1} pts'}" FontWeight="Bold" FontSize="11" Foreground="#38BDF8" />
+                                                        </Border>
+                                                    </Grid>
+
+                                                    <!-- Scores Breakdown -->
+                                                    <Grid Margin="0,0,0,4">
+                                                        <TextBlock Text="Sharpness: " Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                                        <TextBlock Text="{Binding SharpnessScore, StringFormat='{}{0:F1} pts'}" Foreground="{StaticResource SuccessAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
+                                                    </Grid>
+                                                    <Grid Margin="0,0,0,4">
+                                                        <TextBlock Text="Smoothness SNR: " Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                                        <TextBlock Text="{Binding SmoothnessSnrScore, StringFormat='{}{0:F1} pts'}" Foreground="{StaticResource PrimaryAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
+                                                    </Grid>
+                                                    <Grid Margin="0,0,0,8">
+                                                        <TextBlock Text="Artifact-Free: " Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                                        <TextBlock Text="{Binding ArtifactFreeScore, StringFormat='{}{0:F1} pts'}" Foreground="{StaticResource WarningAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
+                                                    </Grid>
+
+                                                    <Button Content="✓ Adopt as Master Output" Style="{StaticResource ModernButton}" Command="{Binding DataContext.SelectLabWinnerCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Background="#1E1B4B" BorderBrush="#6366F1" Foreground="#C7D2FE" FontWeight="Bold" Padding="10,6" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
 
                     <!-- Interactive Pixel Inspector HUD Overlay (Floating at Bottom-Left) -->
                     <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16"
@@ -575,5 +709,68 @@
                 </Grid>
             </Grid>
         </Border>
+
+        <!-- 4. Artifact Hunter Diagnostic Popup Modal Overlay -->
+        <Grid Grid.Row="0" Grid.RowSpan="3" Background="#AA030712" Visibility="{Binding IsHunterPopupOpen, Converter={StaticResource BoolToVis}}">
+            <Border Width="680" Background="#0F172A" BorderBrush="#A855F7" BorderThickness="2" CornerRadius="12" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel>
+                    <Grid Margin="0,0,0,12">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="🎯 ARTIFACT HUNTER DIAGNOSTIC SCAN" FontWeight="Bold" FontSize="15" Foreground="#C084FC" VerticalAlignment="Center" />
+                            <Border Background="#3B0764" BorderBrush="#A855F7" BorderThickness="1" CornerRadius="4" Padding="6,2" Margin="10,0,0,0">
+                                <TextBlock Text="{Binding HunterReport.HealthScore, StringFormat='Health: {0}%'}" FontWeight="Bold" FontSize="11" Foreground="#F3E8FF" />
+                            </Border>
+                        </StackPanel>
+                        <Button Content="✕" Style="{StaticResource ModernButton}" Command="{Binding CloseHunterPopupCommand}" HorizontalAlignment="Right" Padding="8,4" FontWeight="Bold" />
+                    </Grid>
+
+                    <!-- 6 Risk Metric Bars -->
+                    <Border Background="#030712" BorderBrush="#1F2937" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,12">
+                        <ItemsControl ItemsSource="{Binding HunterReport.Metrics}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid Margin="0,2">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="80" />
+                                            <ColumnDefinition Width="140" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Type}" FontWeight="Bold" Foreground="#C084FC" FontSize="11" />
+                                        <TextBlock Grid.Column="1" Text="{Binding AsciiBar}" FontFamily="Consolas, Monospace" Foreground="#38BDF8" FontSize="11" />
+                                        <TextBlock Grid.Column="2" Text="{Binding Summary}" Foreground="{StaticResource TextSecondary}" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Border>
+
+                    <TextBlock Text="🚨 DETECTED ROOT-CAUSE HOTSPOTS:" FontWeight="Bold" FontSize="12" Foreground="{StaticResource WarningAccent}" Margin="0,0,0,6" />
+                    <ItemsControl ItemsSource="{Binding HunterReport.Hotspots}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#1E293B" BorderBrush="{StaticResource BorderHover}" BorderThickness="1" CornerRadius="6" Padding="8" Margin="0,0,0,6">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" Background="#3B0764" CornerRadius="4" Padding="6,2" Margin="0,0,8,0" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding RiskType}" FontWeight="Bold" FontSize="10" Foreground="#F3E8FF" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding RootCauseDescription}" Foreground="{StaticResource TextPrimary}" FontSize="11" FontWeight="SemiBold" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{Binding ProblematicFrameNumber, StringFormat='Frame #{0}'}" Foreground="{StaticResource WarningAccent}" FontWeight="Bold" FontSize="11" VerticalAlignment="Center" Margin="6,0,0,0" />
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <Button Content="✓ Close Hunter Report" Style="{StaticResource PrimaryActionButton}" Command="{Binding CloseHunterPopupCommand}" Margin="0,12,0,0" Height="36" FontWeight="Bold" />
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
