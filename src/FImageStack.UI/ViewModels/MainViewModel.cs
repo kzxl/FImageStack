@@ -11,10 +11,12 @@ using FImageStack.Core.PostProcessing;
 using FImageStack.Core.Presets;
 using FImageStack.Core.Quality;
 using FImageStack.Core.Retouch;
+using FImageStack.Core.Selection;
 using FImageStack.Infrastructure.IO;
 using FImageStack.UI.Common;
 using FImageStack.UI.Utils;
 using Microsoft.Win32;
+using StackFrame = FImageStack.Core.Models.StackFrame;
 
 namespace FImageStack.UI.ViewModels;
 
@@ -45,6 +47,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly IProjectService _projectService;
     private readonly IImageIO _imageIO;
     private readonly IPostProcessEngine _postProcessEngine;
+    private readonly ISmartFrameSelector _frameSelector;
 
     private CancellationTokenSource? _cts;
     private ProcessedStackResult? _lastResult;
@@ -484,6 +487,8 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand CancelStackingCommand { get; }
     public ICommand ExportResultCommand { get; }
     public ICommand SelectAllFramesCommand { get; }
+    public ICommand AutoCullBadFramesCommand { get; }
+    public ICommand AnalyzeFramesCommand { get; }
     public ICommand ResetPostProcessingCommand { get; }
     public ICommand JumpToInspectedFrameCommand { get; }
     public ICommand UndoRetouchCommand { get; }
@@ -496,6 +501,7 @@ public sealed class MainViewModel : ViewModelBase
         _projectService = new ProjectService();
         _stackService = new StackService(_imageIO);
         _postProcessEngine = new StandardPostProcessEngine();
+        _frameSelector = new SmartFrameSelector();
 
         foreach (var p in StackingPreset.GetBuiltinPresets())
         {
@@ -513,6 +519,22 @@ public sealed class MainViewModel : ViewModelBase
             bool anyUnchecked = Frames.Any(f => !f.IsSelected);
             foreach (var f in Frames) f.IsSelected = anyUnchecked;
         });
+
+        AutoCullBadFramesCommand = new RelayCommand(_ =>
+        {
+            int culledCount = 0;
+            foreach (var f in Frames)
+            {
+                if (f.IsBadFrame || f.IsDuplicate)
+                {
+                    f.IsSelected = false;
+                    culledCount++;
+                }
+            }
+            StatusMessage = $"Smart Filter: Excluded {culledCount} bad/duplicate frames from stack.";
+        });
+
+        AnalyzeFramesCommand = new AsyncRelayCommand(AnalyzeStackQualityAsync);
 
         ResetPostProcessingCommand = new RelayCommand(_ =>
         {
@@ -566,6 +588,52 @@ public sealed class MainViewModel : ViewModelBase
         {
             LoadFolder(defaultSample);
         }
+    }
+
+    public async Task AnalyzeStackQualityAsync()
+    {
+        if (Frames.Count == 0) return;
+
+        StatusMessage = "Analyzing stack frames for blur, duplicates, and exposure...";
+
+        await Task.Run(() =>
+        {
+            var loadedFrames = new List<StackFrame>(Frames.Count);
+            try
+            {
+                for (int i = 0; i < Frames.Count; i++)
+                {
+                    var f = _imageIO.LoadFrame(Frames[i].FilePath, i);
+                    loadedFrames.Add(f);
+                }
+
+                var diags = _frameSelector.AnalyzeStack(loadedFrames);
+
+                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                {
+                    int badCount = 0;
+                    for (int i = 0; i < diags.Count && i < Frames.Count; i++)
+                    {
+                        var d = diags[i];
+                        var item = Frames[i];
+
+                        item.SharpnessScore = d.SharpnessScore;
+                        item.IsBadFrame = d.IsBadFrame && !d.IsDuplicate;
+                        item.IsDuplicate = d.IsDuplicate;
+                        item.QualityBadge = d.BadgeText;
+                        item.QualityTooltip = string.IsNullOrEmpty(d.Reason) ? $"Sharpness: {d.SharpnessScore:F0}% | Exposure: {d.ExposureMean * 100:F0}%" : d.Reason;
+
+                        if (d.IsBadFrame || d.IsDuplicate) badCount++;
+                    }
+
+                    StatusMessage = $"Analysis complete: Flagged {badCount} problematic/duplicate frame(s).";
+                });
+            }
+            finally
+            {
+                foreach (var lf in loadedFrames) lf.Dispose();
+            }
+        });
     }
 
     public unsafe void ApplyBrushStroke(float x, float y)
@@ -730,6 +798,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             SelectedFrame = Frames[0];
             StatusMessage = $"Loaded {Frames.Count} frames from {Path.GetFileName(folderPath)}";
+            _ = AnalyzeStackQualityAsync();
         }
         else
         {

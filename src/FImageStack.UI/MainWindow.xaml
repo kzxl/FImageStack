@@ -73,14 +73,16 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="14,10">
+                    <Border Grid.Row="0" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="12,8">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
-                            <TextBlock Text="{Binding Frames.Count, StringFormat='Stack Frames ({0})'}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
-                            <Button Grid.Column="1" Content="Toggle All" Style="{StaticResource ModernButton}" Command="{Binding SelectAllFramesCommand}" Padding="8,3" FontSize="11" />
+                            <TextBlock Text="{Binding Frames.Count, StringFormat='Frames ({0})'}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource TextPrimary}" VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="⚡ Cull" Style="{StaticResource ModernButton}" Command="{Binding AutoCullBadFramesCommand}" ToolTip="Automatically uncheck all bad/duplicate frames" Padding="6,3" FontSize="11" Margin="0,0,4,0" Foreground="{StaticResource WarningAccent}" />
+                            <Button Grid.Column="2" Content="Toggle" Style="{StaticResource ModernButton}" Command="{Binding SelectAllFramesCommand}" Padding="6,3" FontSize="11" />
                         </Grid>
                     </Border>
 
@@ -89,11 +91,11 @@
                         <ListBox.ItemContainerStyle>
                             <Style TargetType="ListBoxItem">
                                 <Setter Property="Background" Value="Transparent" />
-                                <Setter Property="Padding" Value="4,3" />
+                                <Setter Property="Padding" Value="4,2" />
                                 <Setter Property="Template">
                                     <Setter.Value>
                                         <ControlTemplate TargetType="ListBoxItem">
-                                            <Border x:Name="itemBorder" Background="{TemplateBinding Background}" CornerRadius="6" Margin="6,2" Padding="6" BorderThickness="1" BorderBrush="Transparent">
+                                            <Border x:Name="itemBorder" Background="{TemplateBinding Background}" CornerRadius="6" Margin="4,2" Padding="6" BorderThickness="1" BorderBrush="Transparent">
                                                 <ContentPresenter />
                                             </Border>
                                             <ControlTemplate.Triggers>
@@ -113,27 +115,32 @@
                         </ListBox.ItemContainerStyle>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="65" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
+                                <Border Background="{Binding StatusBackgroundColorHex}" BorderBrush="{Binding StatusBorderColorHex}" BorderThickness="1" CornerRadius="5" Padding="4" ToolTip="{Binding QualityTooltip}">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="65" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
 
-                                    <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                        <CheckBox Grid.Column="0" IsChecked="{Binding IsSelected}" VerticalAlignment="Center" Margin="0,0,6,0" />
 
-                                    <Border Grid.Column="1" Height="44" Background="#0A0C14" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="4" ClipToBounds="True" Margin="0,0,8,0">
-                                        <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
-                                    </Border>
+                                        <Border Grid.Column="1" Height="44" Background="#0A0C14" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="4" ClipToBounds="True" Margin="0,0,8,0">
+                                            <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                                        </Border>
 
-                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" FontSize="12" />
-                                        <Grid Margin="0,2,0,0">
-                                            <TextBlock Text="{Binding Index, StringFormat='Frame #{0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" />
-                                            <TextBlock Text="{Binding PriorityWeight, StringFormat='Weight: {0:F1}x'}" Foreground="{StaticResource PrimaryAccent}" FontSize="11" HorizontalAlignment="Right" FontWeight="Medium" />
-                                        </Grid>
-                                    </StackPanel>
-                                </Grid>
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                            <Grid>
+                                                <TextBlock Text="{Binding FileName}" Foreground="{StaticResource TextPrimary}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" FontSize="12" Margin="0,0,50,0" />
+                                                <TextBlock Text="{Binding QualityBadge}" HorizontalAlignment="Right" FontSize="10" FontWeight="Bold" Foreground="{Binding StatusBorderColorHex}" />
+                                            </Grid>
+                                            <Grid Margin="0,3,0,0">
+                                                <TextBlock Text="{Binding Index, StringFormat='Frame #{0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" />
+                                                <TextBlock Text="{Binding PriorityWeight, StringFormat='Weight: {0:F1}x'}" Foreground="{StaticResource PrimaryAccent}" FontSize="11" HorizontalAlignment="Right" FontWeight="Medium" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>

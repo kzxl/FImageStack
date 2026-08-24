@@ -9,9 +9,13 @@ public sealed class FrameItemViewModel : ViewModelBase
 {
     private bool _isSelected = true;
     private BitmapImage? _thumbnail;
-    private double _sharpnessScore;
+    private double _sharpnessScore = 100.0;
     private bool _isExcluded;
     private float _priorityWeight = 1.0f;
+    private bool _isBadFrame;
+    private bool _isDuplicate;
+    private string _qualityBadge = "✅ OK";
+    private string _qualityTooltip = "Good quality frame";
 
     public int Index { get; }
     public string FilePath { get; }
@@ -41,6 +45,47 @@ public sealed class FrameItemViewModel : ViewModelBase
         get => _sharpnessScore;
         set => SetProperty(ref _sharpnessScore, value);
     }
+
+    public bool IsBadFrame
+    {
+        get => _isBadFrame;
+        set
+        {
+            if (SetProperty(ref _isBadFrame, value))
+            {
+                OnPropertyChanged(nameof(StatusBorderColorHex));
+                OnPropertyChanged(nameof(StatusBackgroundColorHex));
+            }
+        }
+    }
+
+    public bool IsDuplicate
+    {
+        get => _isDuplicate;
+        set
+        {
+            if (SetProperty(ref _isDuplicate, value))
+            {
+                OnPropertyChanged(nameof(StatusBorderColorHex));
+                OnPropertyChanged(nameof(StatusBackgroundColorHex));
+            }
+        }
+    }
+
+    public string QualityBadge
+    {
+        get => _qualityBadge;
+        set => SetProperty(ref _qualityBadge, value);
+    }
+
+    public string QualityTooltip
+    {
+        get => _qualityTooltip;
+        set => SetProperty(ref _qualityTooltip, value);
+    }
+
+    public string StatusBorderColorHex => IsBadFrame ? "#EF4444" : (IsDuplicate ? "#F59E0B" : "Transparent");
+    public string StatusBackgroundColorHex => IsBadFrame ? "#261318" : (IsDuplicate ? "#262013" : "Transparent");
 
     public BitmapImage? Thumbnail
     {
