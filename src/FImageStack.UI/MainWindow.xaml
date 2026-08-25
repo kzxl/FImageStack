@@ -56,13 +56,7 @@
                     </Border>
 
                     <!-- Pre-Stack Diagnostic Hunter Button -->
-                    <Button Content="🎯 Hunt Artifacts" Style="{StaticResource ModernButton}" Command="{Binding HuntArtifactsCommand}" Background="#3B0764" BorderBrush="#A855F7" Foreground="#F3E8FF" FontWeight="Bold" Margin="0,0,10,0" Padding="12,6" ToolTip="Pre-stack diagnostic scan in 1s for ghosting, halos, blur, and motion" />
-
-                    <TextBlock Text="Quick Samples:" Foreground="{StaticResource TextSecondary}" FontWeight="Medium" VerticalAlignment="Center" Margin="0,0,8,0" />
-                    <Button Content="20 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="20" Margin="0,0,6,0" Padding="10,5" />
-                    <Button Content="50 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="50" Margin="0,0,6,0" Padding="10,5" />
-                    <Button Content="100 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="100" Margin="0,0,6,0" Padding="10,5" />
-                    <Button Content="200 Frames" Style="{StaticResource ModernButton}" Command="{Binding LoadSampleStackCommand}" CommandParameter="200" Margin="0,0,12,0" Padding="10,5" />
+                    <Button Content="🎯 Hunt Artifacts" Style="{StaticResource ModernButton}" Command="{Binding HuntArtifactsCommand}" Background="#3B0764" BorderBrush="#A855F7" Foreground="#F3E8FF" FontWeight="Bold" Margin="0,0,12,0" Padding="12,6" ToolTip="Pre-stack diagnostic scan in 1s for ghosting, halos, blur, and motion" />
 
                     <Button Content="📁 Save Project..." Style="{StaticResource ModernButton}" Command="{Binding SaveProjectCommand}" Background="#1E1B4B" BorderBrush="#6366F1" Foreground="#C7D2FE" FontWeight="Bold" Margin="0,0,6,0" Padding="12,6" ToolTip="Save non-destructive *.fstack project package with zero-recomputation cache" />
                     <Button Content="📂 Open Project..." Style="{StaticResource ModernButton}" Command="{Binding OpenProjectCommand}" Background="#0F172A" BorderBrush="#38BDF8" Foreground="#E0F2FE" FontWeight="Bold" Margin="0,0,10,0" Padding="12,6" ToolTip="Open existing *.fstack project package instantly without recomputing" />

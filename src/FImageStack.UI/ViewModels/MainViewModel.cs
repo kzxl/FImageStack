@@ -924,13 +924,6 @@ public sealed class MainViewModel : ViewModelBase
         ApplyVirtualDofCommand = new AsyncRelayCommand(ExecuteApplyVirtualDofAsync, () => _lastResult != null && !IsProcessing);
         RunStackLabCommand = new AsyncRelayCommand(ExecuteRunStackLabAsync, () => !IsProcessing && Frames.Count >= 2);
         SelectLabWinnerCommand = new RelayCommand(param => ExecuteSelectLabWinner(param as StackLabSlot));
-
-        // Try pre-loading test dataset if available
-        string defaultSample = @"data\test_stack_50";
-        if (Directory.Exists(defaultSample))
-        {
-            LoadFolder(defaultSample);
-        }
     }
 
     public async Task AnalyzeStackQualityAsync()
