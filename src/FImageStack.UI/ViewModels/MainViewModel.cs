@@ -1074,44 +1074,62 @@ public sealed class MainViewModel : ViewModelBase
     private async Task ExecuteRunStackLabAsync()
     {
         if (Frames.Count < 2) return;
+        IsProcessing = true;
         StatusMessage = "A/B Stack Lab: Running multi-algorithm benchmark matrix in parallel...";
 
-        await Task.Run(() =>
+        try
         {
-            var loadedFrames = new List<StackFrame>(Frames.Count);
-            try
+            await Task.Run(() =>
             {
-                int sampleCount = Math.Min(Frames.Count, 15);
-                for (int i = 0; i < sampleCount; i++)
+                var loadedFrames = new List<StackFrame>(Frames.Count);
+                try
                 {
-                    if (File.Exists(Frames[i].FilePath))
+                    int sampleCount = Math.Min(Frames.Count, 15);
+                    for (int i = 0; i < sampleCount; i++)
                     {
-                        loadedFrames.Add(_imageIO.LoadFrame(Frames[i].FilePath, i));
+                        if (File.Exists(Frames[i].FilePath))
+                        {
+                            // Load proxy size for fast parallel multi-algorithm comparison
+                            loadedFrames.Add(_imageIO.LoadFrame(Frames[i].FilePath, i, maxDimension: 1280));
+                        }
+                    }
+
+                    if (loadedFrames.Count >= 2)
+                    {
+                        var report = _stackLabEngine.RunMultiStackLab(loadedFrames);
+                        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            LabReport = report;
+                            LabSlots.Clear();
+                            foreach (var slot in report.Slots)
+                            {
+                                if (slot.RenderedImage != null)
+                                {
+                                    slot.PreviewBitmap = BitmapHelper.ToBitmapSource(slot.RenderedImage);
+                                }
+                                LabSlots.Add(slot);
+                            }
+                            LabSummaryText = $"Lab Winner: {report.WinnerAlgorithmTitle} with Score {report.WinnerScore:F1} pts!";
+                            SelectedViewTab = 11;
+                            StatusMessage = $"A/B Stack Lab Finished! Best performer: {report.WinnerAlgorithmTitle} ({report.WinnerScore:F1} pts).";
+                        });
                     }
                 }
-
-                if (loadedFrames.Count >= 2)
+                finally
                 {
-                    var report = _stackLabEngine.RunMultiStackLab(loadedFrames);
-                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        LabReport = report;
-                        LabSlots.Clear();
-                        foreach (var slot in report.Slots)
-                        {
-                            LabSlots.Add(slot);
-                        }
-                        LabSummaryText = $"Lab Winner: {report.WinnerAlgorithmTitle} with Score {report.WinnerScore:F1} pts!";
-                        SelectedViewTab = 11;
-                        StatusMessage = $"A/B Stack Lab Finished! Best performer: {report.WinnerAlgorithmTitle} ({report.WinnerScore:F1} pts).";
-                    });
+                    foreach (var lf in loadedFrames) lf.Dispose();
                 }
-            }
-            finally
-            {
-                foreach (var lf in loadedFrames) lf.Dispose();
-            }
-        });
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"A/B Stack Lab Error: {ex.Message}";
+            MessageBox.Show($"A/B Stack Lab encountered an issue:\n{ex.Message}", "A/B Stack Lab Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
     }
 
     private void ExecuteSelectLabWinner(StackLabSlot? slot)

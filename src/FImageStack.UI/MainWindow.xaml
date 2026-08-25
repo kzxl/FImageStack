@@ -355,18 +355,27 @@
                                                         </Border>
                                                     </Grid>
 
+                                                    <!-- Stack Result Thumbnail -->
+                                                    <Border Height="180" Background="#05070E" BorderBrush="#1E293B" BorderThickness="1" CornerRadius="4" Margin="0,0,0,8" ClipToBounds="True">
+                                                        <Image Source="{Binding PreviewBitmap}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                                                    </Border>
+
                                                     <!-- Scores Breakdown -->
-                                                    <Grid Margin="0,0,0,4">
+                                                    <Grid Margin="0,0,0,3">
                                                         <TextBlock Text="Sharpness: " Foreground="{StaticResource TextSecondary}" FontSize="11" />
                                                         <TextBlock Text="{Binding SharpnessScore, StringFormat='{}{0:F1} pts'}" Foreground="{StaticResource SuccessAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
                                                     </Grid>
-                                                    <Grid Margin="0,0,0,4">
+                                                    <Grid Margin="0,0,0,3">
                                                         <TextBlock Text="Smoothness SNR: " Foreground="{StaticResource TextSecondary}" FontSize="11" />
                                                         <TextBlock Text="{Binding SmoothnessSnrScore, StringFormat='{}{0:F1} pts'}" Foreground="{StaticResource PrimaryAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
                                                     </Grid>
-                                                    <Grid Margin="0,0,0,8">
+                                                    <Grid Margin="0,0,0,3">
                                                         <TextBlock Text="Artifact-Free: " Foreground="{StaticResource TextSecondary}" FontSize="11" />
                                                         <TextBlock Text="{Binding ArtifactFreeScore, StringFormat='{}{0:F1} pts'}" Foreground="{StaticResource WarningAccent}" FontWeight="Bold" HorizontalAlignment="Right" FontSize="11" />
+                                                    </Grid>
+                                                    <Grid Margin="0,0,0,8">
+                                                        <TextBlock Text="Speed Duration: " Foreground="{StaticResource TextMuted}" FontSize="11" />
+                                                        <TextBlock Text="{Binding RenderDurationText}" Foreground="#CBD5E1" HorizontalAlignment="Right" FontSize="11" FontFamily="Consolas, Monospace" />
                                                     </Grid>
 
                                                     <Button Content="✓ Adopt as Master Output" Style="{StaticResource ModernButton}" Command="{Binding DataContext.SelectLabWinnerCommand, RelativeSource={RelativeSource AncestorType=Window}}" CommandParameter="{Binding}" Background="#1E1B4B" BorderBrush="#6366F1" Foreground="#C7D2FE" FontWeight="Bold" Padding="10,6" />

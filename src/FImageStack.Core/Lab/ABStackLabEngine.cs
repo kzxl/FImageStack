@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Text;
 using FImageStack.Core.DepthMap;
+using FImageStack.Core.FocusMeasure;
 using FImageStack.Core.Fusion;
 using FImageStack.Core.Models;
 using CoreStackFrame = FImageStack.Core.Models.StackFrame;
@@ -43,8 +44,36 @@ public sealed class ABStackLabEngine : IABStackLabEngine
             TotalSlots = targetMethods.Count
         };
 
+        // 0. Ensure GrayBuffer and FocusMap are computed for all input frames
+        var focusEngine = new ModifiedLaplacianFocusMeasure();
+        for (int i = 0; i < frames.Count; i++)
+        {
+            var f = frames[i];
+            if (f.GrayBuffer == null && f.ColorBuffer != null)
+            {
+                f.GrayBuffer = new ImageBuffer<float>(f.Width, f.Height, 1, PixelFormatType.GrayFloat32);
+                float* cPtr = f.ColorBuffer.DataPointer;
+                float* gPtr = f.GrayBuffer.DataPointer;
+                int ch = f.ColorBuffer.Channels;
+                for (int p = 0; p < f.Width * f.Height; p++)
+                {
+                    gPtr[p] = 0.2126f * cPtr[p * ch] + 0.7152f * cPtr[p * ch + 1] + 0.0722f * cPtr[p * ch + 2];
+                }
+            }
+
+            if (f.FocusMap == null)
+            {
+                f.FocusMap = new ImageBuffer<float>(f.Width, f.Height, 1);
+                var gray = f.GrayBuffer ?? f.ColorBuffer;
+                if (gray != null)
+                {
+                    focusEngine.ComputeFocusMap(gray, f.FocusMap, 2);
+                }
+            }
+        }
+
         // 1. Shared Depth Estimation across all lab slots
-        var depthResult = _depthEstimator.EstimateDepthMap(frames);
+        using var depthResult = _depthEstimator.EstimateDepthMap(frames);
 
         int slotIdx = 0;
         foreach (var method in targetMethods)

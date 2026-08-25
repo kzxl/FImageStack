@@ -8,12 +8,14 @@ public sealed class StackLabSlot : IDisposable
     public string AlgorithmTitle { get; set; } = string.Empty;
     public FusionMethod FusionMethod { get; set; }
     public ImageBuffer<float>? RenderedImage { get; set; }
+    public object? PreviewBitmap { get; set; }
     public float SharpnessScore { get; set; }
     public float SmoothnessSnrScore { get; set; }
     public float ArtifactFreeScore { get; set; }
     public float CompositeScore { get; set; }
     public bool IsWinnerBest { get; set; }
     public TimeSpan RenderDuration { get; set; }
+    public string RenderDurationText => $"{RenderDuration.TotalMilliseconds:F0} ms";
 
     public void Dispose()
     {
