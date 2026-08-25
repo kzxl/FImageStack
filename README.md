@@ -16,6 +16,7 @@
 4. [Dòng Lệnh (CLI Batch Processing)](#-dòng-lệnh-cli-batch-processing)
 5. [Hướng Dẫn Cài Đặt & Biên Dịch](#-hướng-dẫn-cài-đặt--biên-dịch)
 6. [Kiểm Thử & Chất Lượng](#-kiểm-thử--chất-lượng)
+7. [Dữ Liệu Mẫu Kiểm Thử & Nguồn Dẫn](#-dữ-liệu-mẫu-kiểm-thử--nguồn-dẫn-sample-datasets--attribution)
 
 ---
 
@@ -182,6 +183,24 @@ Passed!  - Failed: 0, Passed: 90, Skipped: 0, Total: 90, Duration: 705 ms
 - `Refocus`: Synthetic Aperture Circle-of-Confusion Bokeh, Continuous Depth Slicing.
 - `Lab`: A/B Stack Lab Multi-Algorithm Parallel Engine & Composite Scoring.
 - `Pipelines`: Gigapixel Tiling, Memory-Bounded Partitioning, Exif & Raw Metadata.
+
+---
+
+## 📸 Dữ Liệu Mẫu Kiểm Thử & Nguồn Dẫn (Sample Datasets & Attribution)
+
+Dự án tích hợp sẵn các bộ ảnh chụp macro thực tế được tổ chức tại thư mục `data/real_samples/` phục vụ cho việc kiểm thử chất lượng và benchmark thuật toán:
+
+| Thư mục | Số Frame | Đối Tượng | Nguồn Trích Dẫn & Bản Quyền | Mục Tiêu Kiểm Thử |
+| :--- | :---: | :--- | :--- | :--- |
+| **`01_macro_beetle`** | **12 ảnh** | Bọ cánh cứng (Macro Beetle) | [Interactive Digital Photomontage Dataset (SIGGRAPH 2004)](https://grail.cs.washington.edu/projects/photomontage/) — Aseem Agarwala et al., University of Washington | Benchmark râu côn trùng, ranh giới phức tạp, khử bóng ma & viền tách lớp |
+| **`02_macro_pcb_electronics`** | **10 ảnh** | Bo mạch điện tử SMD / IC | [focus-stack Benchmark Dataset](https://github.com/PetteriAimonen/focus-stack) — Petteri Aimonen | Đo độ sắc nét đường mạch vi mô, canh chỉnh sai lệch phối cảnh Homography |
+| **`03_macro_specimen_36frames`** | **36 ảnh** | Tiêu bản lát cắt sinh học | [Focus Stacking Test Sequences](https://github.com/bznick98/Focus_Stacking) / Helicon Focus Tutorial Samples | Đo biểu đồ sóng 2D Spatio-Temporal Focus Wave & Synthetic Aperture DOF |
+| **`04_macro_specimen_fast5`** | **5 ảnh** | Mẫu vật macro bước dịch thưa | Helicon Focus Sample Sequences | Test tốc độ Fast Preview (0.3s) & chẩn đoán khoảng trống tiêu cự (Focus Gap) |
+
+### Các Nguồn Dataset Mở Đề Xuất Khác:
+- **[araujoalexandre/FocusStackingDataset](https://github.com/araujoalexandre/FocusStackingDataset)**: 94 chuỗi ảnh RAW macro bracketing kèm pseudo-ground truth.
+- **[Zerene Stacker Educational Tutorials](https://zerenesystems.com/cms/stacker/docs/tutorials)**: Kho ảnh tiêu bản côn trùng và khoáng sản vi mô.
+- **[Magic Lantern Focus Stacking Group](http://www.magiclantern.fm/forum/)**: Dữ liệu chụp macro tự động từ máy ảnh Canon DSLR.
 
 ---
 
