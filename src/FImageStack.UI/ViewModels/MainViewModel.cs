@@ -1089,8 +1089,15 @@ public sealed class MainViewModel : ViewModelBase
                     {
                         if (File.Exists(Frames[i].FilePath))
                         {
-                            // Load proxy size for fast parallel multi-algorithm comparison
-                            loadedFrames.Add(_imageIO.LoadFrame(Frames[i].FilePath, i, maxDimension: 1280));
+                            try
+                            {
+                                // Load proxy size for fast parallel multi-algorithm comparison
+                                loadedFrames.Add(_imageIO.LoadFrame(Frames[i].FilePath, i, maxDimension: 1280));
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Skipping corrupted frame {Frames[i].FilePath}: {ex.Message}");
+                            }
                         }
                     }
 

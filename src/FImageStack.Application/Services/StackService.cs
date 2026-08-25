@@ -101,10 +101,20 @@ public sealed class StackService : IStackService
         for (int i = 0; i < filePaths.Count; i++)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            var frame = await Task.Run(() => _imageIO.LoadFrame(filePaths[i], i, maxDim), cancellationToken);
-            frames.Add(frame);
-            progress?.Report(new StackProgress("Loading Frames", (double)(i + 1) / filePaths.Count * 100, $"Loaded {Path.GetFileName(filePaths[i])}"));
+            try
+            {
+                var frame = await Task.Run(() => _imageIO.LoadFrame(filePaths[i], i, maxDim), cancellationToken);
+                frames.Add(frame);
+                progress?.Report(new StackProgress("Loading Frames", (double)(i + 1) / filePaths.Count * 100, $"Loaded {Path.GetFileName(filePaths[i])}"));
+            }
+            catch (Exception ex)
+            {
+                progress?.Report(new StackProgress("Loading Frames", (double)(i + 1) / filePaths.Count * 100, $"Skipped unreadable {Path.GetFileName(filePaths[i])}: {ex.Message}"));
+            }
         }
+
+        if (frames.Count < 2)
+            throw new InvalidOperationException("At least 2 readable image frames are required to perform focus stacking.");
 
         sw.Stop();
         benchmark.LoadTimeMs = sw.Elapsed.TotalMilliseconds;
