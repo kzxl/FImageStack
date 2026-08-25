@@ -936,95 +936,137 @@ public sealed class MainViewModel : ViewModelBase
     public async Task AnalyzeStackQualityAsync()
     {
         if (Frames.Count == 0) return;
-
         StatusMessage = "Analyzing stack frames for blur, duplicates, and exposure...";
 
-        await Task.Run(() =>
+        try
         {
-            var loadedFrames = new List<StackFrame>(Frames.Count);
-            try
+            await Task.Run(() =>
             {
-                for (int i = 0; i < Frames.Count; i++)
+                var loadedFrames = new List<StackFrame>(Frames.Count);
+                try
                 {
-                    var f = _imageIO.LoadFrame(Frames[i].FilePath, i);
-                    loadedFrames.Add(f);
-                }
-
-                var diags = _frameSelector.AnalyzeStack(loadedFrames);
-                var scorecard = _qualityPredictor.PredictQuality(loadedFrames);
-                var waveResult = _focusWaveEngine.AnalyzeFocusWave(loadedFrames);
-
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                {
-                    int badCount = 0;
-                    for (int i = 0; i < diags.Count && i < Frames.Count; i++)
+                    for (int i = 0; i < Frames.Count; i++)
                     {
-                        var d = diags[i];
-                        var item = Frames[i];
-
-                        item.SharpnessScore = d.SharpnessScore;
-                        item.IsBadFrame = d.IsBadFrame && !d.IsDuplicate;
-                        item.IsDuplicate = d.IsDuplicate;
-                        item.QualityBadge = d.BadgeText;
-                        item.QualityTooltip = string.IsNullOrEmpty(d.Reason) ? $"Sharpness: {d.SharpnessScore:F0}% | Exposure: {d.ExposureMean * 100:F0}%" : d.Reason;
-
-                        if (d.IsBadFrame || d.IsDuplicate) badCount++;
+                        if (File.Exists(Frames[i].FilePath))
+                        {
+                            try
+                            {
+                                var f = _imageIO.LoadFrame(Frames[i].FilePath, i, maxDimension: 1280);
+                                loadedFrames.Add(f);
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Skipped unreadable frame {Frames[i].FilePath}: {ex.Message}");
+                            }
+                        }
                     }
 
-                    Scorecard = scorecard;
-                    ScorecardBadgeText = $"{scorecard.GradeTitle} ({scorecard.FinalExpectedQualityScore:F0}%)";
-                    ScorecardSummaryText = scorecard.SummaryMessage;
+                    if (loadedFrames.Count == 0) return;
 
-                    FocusWaveResult = waveResult;
-                    FocusWaveAsciiGraph = waveResult.AsciiWaveGraph;
-                    StepUniformityScoreText = $"{waveResult.StepUniformityScore:F0}% Uniform";
-                    FocusWaveSummaryText = waveResult.EvaluationSummary;
+                    var diags = _frameSelector.AnalyzeStack(loadedFrames);
+                    var scorecard = _qualityPredictor.PredictQuality(loadedFrames);
+                    var waveResult = _focusWaveEngine.AnalyzeFocusWave(loadedFrames);
 
-                    StatusMessage = $"Analysis complete: Flagged {badCount} problematic frame(s). Predicted Quality: {scorecard.GradeTitle}.";
-                });
-            }
-            finally
-            {
-                foreach (var lf in loadedFrames) lf.Dispose();
-            }
-        });
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        int badCount = 0;
+                        for (int i = 0; i < diags.Count && i < Frames.Count; i++)
+                        {
+                            var d = diags[i];
+                            var item = Frames[i];
+
+                            item.SharpnessScore = d.SharpnessScore;
+                            item.IsBadFrame = d.IsBadFrame && !d.IsDuplicate;
+                            item.IsDuplicate = d.IsDuplicate;
+                            item.QualityBadge = d.BadgeText;
+                            item.QualityTooltip = string.IsNullOrEmpty(d.Reason) ? $"Sharpness: {d.SharpnessScore:F0}% | Exposure: {d.ExposureMean * 100:F0}%" : d.Reason;
+
+                            if (d.IsBadFrame || d.IsDuplicate) badCount++;
+                        }
+
+                        Scorecard = scorecard;
+                        ScorecardBadgeText = $"{scorecard.GradeTitle} ({scorecard.FinalExpectedQualityScore:F0}%)";
+                        ScorecardSummaryText = scorecard.SummaryMessage;
+
+                        FocusWaveResult = waveResult;
+                        FocusWaveAsciiGraph = waveResult.AsciiWaveGraph;
+                        StepUniformityScoreText = $"{waveResult.StepUniformityScore:F0}% Uniform";
+                        FocusWaveSummaryText = waveResult.EvaluationSummary;
+
+                        StatusMessage = $"Analysis complete: Flagged {badCount} problematic frame(s). Predicted Quality: {scorecard.GradeTitle}.";
+                    });
+                }
+                finally
+                {
+                    foreach (var lf in loadedFrames) lf.Dispose();
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Quality analysis notice: {ex.Message}";
+        }
     }
 
     private async Task ExecuteHuntArtifactsAsync()
     {
         if (Frames.Count < 2) return;
+        IsProcessing = true;
         StatusMessage = "Artifact Hunter: Scanning entire stack for ghosting, halos, blur and alignment risks...";
 
-        await Task.Run(() =>
+        try
         {
-            var loadedFrames = new List<StackFrame>(Frames.Count);
-            try
+            await Task.Run(() =>
             {
-                int sampleCount = Math.Min(Frames.Count, 20);
-                for (int i = 0; i < sampleCount; i++)
+                var loadedFrames = new List<StackFrame>(Frames.Count);
+                try
                 {
-                    if (File.Exists(Frames[i].FilePath))
+                    int sampleCount = Math.Min(Frames.Count, 20);
+                    for (int i = 0; i < sampleCount; i++)
                     {
-                        loadedFrames.Add(_imageIO.LoadFrame(Frames[i].FilePath, i));
+                        if (File.Exists(Frames[i].FilePath))
+                        {
+                            try
+                            {
+                                loadedFrames.Add(_imageIO.LoadFrame(Frames[i].FilePath, i, maxDimension: 1280));
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Skipping unreadable frame {Frames[i].FilePath}: {ex.Message}");
+                            }
+                        }
+                    }
+
+                    if (loadedFrames.Count >= 2)
+                    {
+                        var report = _hunterEngine.HuntArtifacts(loadedFrames);
+                        System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            HunterReport = report;
+                            IsHunterPopupOpen = true;
+                            StatusMessage = $"Artifact Hunter Scan Complete! Health Score: {report.HealthScore}% with {report.Hotspots.Count} hotspots.";
+                        });
+                    }
+                    else
+                    {
+                        StatusMessage = "Artifact Hunter: Not enough valid frames to scan.";
                     }
                 }
-
-                if (loadedFrames.Count >= 2)
+                finally
                 {
-                    var report = _hunterEngine.HuntArtifacts(loadedFrames);
-                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
-                    {
-                        HunterReport = report;
-                        IsHunterPopupOpen = true;
-                        StatusMessage = $"Artifact Hunter Scan Complete! Health Score: {report.HealthScore}% with {report.Hotspots.Count} hotspots.";
-                    });
+                    foreach (var lf in loadedFrames) lf.Dispose();
                 }
-            }
-            finally
-            {
-                foreach (var lf in loadedFrames) lf.Dispose();
-            }
-        });
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Artifact Hunter Error: {ex.Message}";
+            MessageBox.Show($"Artifact Hunter encountered an issue:\n{ex.Message}", "Artifact Hunter Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
     }
 
     private async Task ExecuteApplyVirtualDofAsync()
@@ -1035,40 +1077,62 @@ public sealed class MainViewModel : ViewModelBase
             return;
         }
 
+        IsProcessing = true;
         StatusMessage = $"Rendering Virtual DOF (Aperture: f/{VirtualAperture * 2.8f:F1}, Range: [{VirtualDofMin:F1}..{VirtualDofMax:F1}])...";
 
-        await Task.Run(() =>
+        try
         {
-            var loadedFrames = new List<StackFrame>(Frames.Count);
-            try
+            await Task.Run(() =>
             {
-                for (int i = 0; i < Frames.Count; i++)
+                var loadedFrames = new List<StackFrame>(Frames.Count);
+                try
                 {
-                    if (File.Exists(Frames[i].FilePath))
+                    for (int i = 0; i < Frames.Count; i++)
                     {
-                        loadedFrames.Add(_imageIO.LoadFrame(Frames[i].FilePath, i));
+                        if (File.Exists(Frames[i].FilePath))
+                        {
+                            try
+                            {
+                                loadedFrames.Add(_imageIO.LoadFrame(Frames[i].FilePath, i, maxDimension: 1280));
+                            }
+                            catch (Exception ex)
+                            {
+                                System.Diagnostics.Debug.WriteLine($"Skipping unreadable frame {Frames[i].FilePath}: {ex.Message}");
+                            }
+                        }
                     }
+
+                    if (loadedFrames.Count == 0) return;
+
+                    var rendered = _refocusEngine.RenderSelectiveDofRange(
+                        _lastResult.DepthResult,
+                        loadedFrames,
+                        VirtualDofMin,
+                        VirtualDofMax);
+
+                    System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                    {
+                        VirtualDofBitmap = BitmapHelper.ToBitmapSource(rendered);
+                        SelectedViewTab = 10;
+                        UpdateDisplayBitmap();
+                        StatusMessage = $"Virtual DOF Render Complete (Aperture: {VirtualAperture:F2}x, Range: [{VirtualDofMin:F1}..{VirtualDofMax:F1}]).";
+                    });
                 }
-
-                var rendered = _refocusEngine.RenderSelectiveDofRange(
-                    _lastResult.DepthResult,
-                    loadedFrames,
-                    VirtualDofMin,
-                    VirtualDofMax);
-
-                System.Windows.Application.Current.Dispatcher.Invoke(() =>
+                finally
                 {
-                    VirtualDofBitmap = BitmapHelper.ToBitmapSource(rendered);
-                    SelectedViewTab = 10;
-                    UpdateDisplayBitmap();
-                    StatusMessage = $"Virtual DOF Render Complete (Aperture: {VirtualAperture:F2}x, Range: [{VirtualDofMin:F1}..{VirtualDofMax:F1}]).";
-                });
-            }
-            finally
-            {
-                foreach (var lf in loadedFrames) lf.Dispose();
-            }
-        });
+                    foreach (var lf in loadedFrames) lf.Dispose();
+                }
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Virtual DOF Error: {ex.Message}";
+            MessageBox.Show($"Virtual DOF failed:\n{ex.Message}", "Virtual DOF Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
     }
 
     private async Task ExecuteRunStackLabAsync()
@@ -1152,72 +1216,79 @@ public sealed class MainViewModel : ViewModelBase
 
     public unsafe void ApplyBrushStroke(float x, float y)
     {
-        if (_lastResult == null || _retouchLayer == null) return;
-        if (RetouchSourceFrameIndex < 0 || RetouchSourceFrameIndex >= Frames.Count) return;
-
-        var stroke = new RetouchStroke
+        try
         {
-            StrokeId = _retouchLayer.Strokes.Count + 1,
-            Tool = ActiveRetouchTool,
-            SourceFrameIndex = RetouchSourceFrameIndex,
-            CenterX = x,
-            CenterY = y,
-            Radius = BrushRadius,
-            Feather = BrushFeather,
-            Opacity = BrushOpacity
-        };
+            if (_lastResult == null || _retouchLayer == null) return;
+            if (RetouchSourceFrameIndex < 0 || RetouchSourceFrameIndex >= Frames.Count) return;
 
-        _retouchLayer.AddStroke(stroke);
-        UpdateRetouchStrokesCount();
-
-        // Real-time incremental patch on current post-processed buffer
-        if (_postProcessedBuffer != null && File.Exists(Frames[RetouchSourceFrameIndex].FilePath))
-        {
-            using var srcFrame = _imageIO.LoadFrame(Frames[RetouchSourceFrameIndex].FilePath, RetouchSourceFrameIndex);
-            int w = _postProcessedBuffer.Width;
-            int h = _postProcessedBuffer.Height;
-
-            int x0 = Math.Max(0, (int)(x - BrushRadius));
-            int y0 = Math.Max(0, (int)(y - BrushRadius));
-            int x1 = Math.Min(w, (int)(x + BrushRadius + 1));
-            int y1 = Math.Min(h, (int)(y + BrushRadius + 1));
-
-            float rSq = BrushRadius * BrushRadius;
-            float innerRadius = BrushRadius * (1f - BrushFeather);
-            float innerSq = innerRadius * innerRadius;
-
-            float* dstPtr = _postProcessedBuffer.DataPointer;
-            float* srcPtr = srcFrame.ColorBuffer!.DataPointer;
-
-            Parallel.For(y0, y1, py =>
+            var stroke = new RetouchStroke
             {
-                int rowOffset = py * w;
-                float dy = py - y;
-                float dySq = dy * dy;
+                StrokeId = _retouchLayer.Strokes.Count + 1,
+                Tool = ActiveRetouchTool,
+                SourceFrameIndex = RetouchSourceFrameIndex,
+                CenterX = x,
+                CenterY = y,
+                Radius = BrushRadius,
+                Feather = BrushFeather,
+                Opacity = BrushOpacity
+            };
 
-                for (int px = x0; px < x1; px++)
+            _retouchLayer.AddStroke(stroke);
+            UpdateRetouchStrokesCount();
+
+            // Real-time incremental patch on current post-processed buffer
+            if (_postProcessedBuffer != null && File.Exists(Frames[RetouchSourceFrameIndex].FilePath))
+            {
+                using var srcFrame = _imageIO.LoadFrame(Frames[RetouchSourceFrameIndex].FilePath, RetouchSourceFrameIndex);
+                int w = _postProcessedBuffer.Width;
+                int h = _postProcessedBuffer.Height;
+
+                int x0 = Math.Max(0, (int)(x - BrushRadius));
+                int y0 = Math.Max(0, (int)(y - BrushRadius));
+                int x1 = Math.Min(w, (int)(x + BrushRadius + 1));
+                int y1 = Math.Min(h, (int)(y + BrushRadius + 1));
+
+                float rSq = BrushRadius * BrushRadius;
+                float innerRadius = BrushRadius * (1f - BrushFeather);
+                float innerSq = innerRadius * innerRadius;
+
+                float* dstPtr = _postProcessedBuffer.DataPointer;
+                float* srcPtr = srcFrame.ColorBuffer!.DataPointer;
+
+                Parallel.For(y0, y1, py =>
                 {
-                    float dx = px - x;
-                    float distSq = dx * dx + dySq;
-                    if (distSq > rSq) continue;
+                    int rowOffset = py * w;
+                    float dy = py - y;
+                    float dySq = dy * dy;
 
-                    float weight = BrushOpacity;
-                    if (distSq > innerSq && BrushFeather > 0)
+                    for (int px = x0; px < x1; px++)
                     {
-                        float dist = MathF.Sqrt(distSq);
-                        float featherT = (dist - innerRadius) / (BrushRadius - innerRadius + 1e-5f);
-                        weight *= 0.5f * (1.0f + MathF.Cos(featherT * MathF.PI));
+                        float dx = px - x;
+                        float distSq = dx * dx + dySq;
+                        if (distSq > rSq) continue;
+
+                        float weight = BrushOpacity;
+                        if (distSq > innerSq && BrushFeather > 0)
+                        {
+                            float dist = MathF.Sqrt(distSq);
+                            float featherT = (dist - innerRadius) / (BrushRadius - innerRadius + 1e-5f);
+                            weight *= 0.5f * (1.0f + MathF.Cos(featherT * MathF.PI));
+                        }
+
+                        int idx = (rowOffset + px) * 3;
+                        dstPtr[idx] = dstPtr[idx] * (1f - weight) + srcPtr[idx] * weight;
+                        dstPtr[idx + 1] = dstPtr[idx + 1] * (1f - weight) + srcPtr[idx + 1] * weight;
+                        dstPtr[idx + 2] = dstPtr[idx + 2] * (1f - weight) + srcPtr[idx + 2] * weight;
                     }
+                });
 
-                    int idx = (rowOffset + px) * 3;
-                    dstPtr[idx] = dstPtr[idx] * (1f - weight) + srcPtr[idx] * weight;
-                    dstPtr[idx + 1] = dstPtr[idx + 1] * (1f - weight) + srcPtr[idx + 1] * weight;
-                    dstPtr[idx + 2] = dstPtr[idx + 2] * (1f - weight) + srcPtr[idx + 2] * weight;
-                }
-            });
-
-            FusedBitmap = BitmapHelper.ToBitmapSource(_postProcessedBuffer);
-            if (SelectedViewTab == 0) DisplayBitmap = FusedBitmap;
+                FusedBitmap = BitmapHelper.ToBitmapSource(_postProcessedBuffer);
+                if (SelectedViewTab == 0) DisplayBitmap = FusedBitmap;
+            }
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Brush stroke notice: {ex.Message}");
         }
     }
 
@@ -1229,84 +1300,91 @@ public sealed class MainViewModel : ViewModelBase
 
     public unsafe void InspectPixel(int x, int y)
     {
-        if (_lastResult == null || _lastResult.DepthResult == null) return;
-
-        var depthRes = _lastResult.DepthResult;
-        int w = depthRes.Width;
-        int h = depthRes.Height;
-
-        if (x < 0 || x >= w || y < 0 || y >= h) return;
-
-        int idx = y * w + x;
-        int frameIdx = depthRes.SourceFrameMap.DataPointer[idx];
-        float depthZ = depthRes.DepthMap.DataPointer[idx];
-        float conf = depthRes.ConfidenceMap.DataPointer[idx];
-        float dofVal = depthRes.DofMap != null ? depthRes.DofMap.DataPointer[idx] * Math.Max(1, Frames.Count - 1) : 1.0f;
-        bool isGap = depthRes.FocusGapMask != null && depthRes.FocusGapMask.DataPointer[idx] > 0.5f;
-
-        float subFrame = depthZ * Math.Max(1, Frames.Count - 1);
-        string fileName = (frameIdx >= 0 && frameIdx < Frames.Count) ? Frames[frameIdx].FileName : $"Frame #{frameIdx + 1}";
-        bool isValid = conf >= 0.15f && !isGap;
-
-        string curveSummary = string.Empty;
-        if (depthRes.FocusVolume != null && depthRes.FocusVolume.Width == w && depthRes.FocusVolume.Height == h)
+        try
         {
-            var profileSpan = depthRes.FocusVolume.GetProfile(x, y);
-            var sb = new System.Text.StringBuilder();
-            sb.Append("[");
-            for (int f = 0; f < profileSpan.Length; f++)
+            if (_lastResult == null || _lastResult.DepthResult == null) return;
+
+            var depthRes = _lastResult.DepthResult;
+            int w = depthRes.Width;
+            int h = depthRes.Height;
+
+            if (x < 0 || x >= w || y < 0 || y >= h) return;
+
+            int idx = y * w + x;
+            int frameIdx = depthRes.SourceFrameMap.DataPointer[idx];
+            float depthZ = depthRes.DepthMap.DataPointer[idx];
+            float conf = depthRes.ConfidenceMap.DataPointer[idx];
+            float dofVal = depthRes.DofMap != null ? depthRes.DofMap.DataPointer[idx] * Math.Max(1, Frames.Count - 1) : 1.0f;
+            bool isGap = depthRes.FocusGapMask != null && depthRes.FocusGapMask.DataPointer[idx] > 0.5f;
+
+            float subFrame = depthZ * Math.Max(1, Frames.Count - 1);
+            string fileName = (frameIdx >= 0 && frameIdx < Frames.Count) ? Frames[frameIdx].FileName : $"Frame #{frameIdx + 1}";
+            bool isValid = conf >= 0.15f && !isGap;
+
+            string curveSummary = string.Empty;
+            if (depthRes.FocusVolume != null && depthRes.FocusVolume.Width == w && depthRes.FocusVolume.Height == h)
             {
-                sb.Append($"F{f + 1}: {profileSpan[f]:F2}");
-                if (f == frameIdx) sb.Append("★");
-                if (f < profileSpan.Length - 1) sb.Append(" | ");
+                var profileSpan = depthRes.FocusVolume.GetProfile(x, y);
+                var sb = new System.Text.StringBuilder();
+                sb.Append("[");
+                for (int f = 0; f < profileSpan.Length; f++)
+                {
+                    sb.Append($"F{f + 1}: {profileSpan[f]:F2}");
+                    if (f == frameIdx) sb.Append("★");
+                    if (f < profileSpan.Length - 1) sb.Append(" | ");
+                }
+                sb.Append("]");
+                curveSummary = sb.ToString();
             }
-            sb.Append("]");
-            curveSummary = sb.ToString();
-        }
 
-        string breakdownText = $"Sharpness: {conf:F2} | Conf: {conf * 100f:F0}%";
-        string transitionText = string.Empty;
-        if (depthRes.FocusVolume != null)
-        {
-            var profileSpan = depthRes.FocusVolume.GetProfile(x, y);
-            float s = conf;
-            float a = Math.Clamp(1.0f - MathF.Abs(depthZ - (float)frameIdx / Math.Max(1, Frames.Count - 1)), 0.1f, 1.0f);
-            float m = _lastResult.MotionResult?.MotionMap != null ? _lastResult.MotionResult.MotionMap.DataPointer[idx] : 0f;
-            float e = Math.Clamp(s * 1.1f, 0.2f, 1.0f);
-
-            float neighborMean = 0f;
-            if (profileSpan.Length >= 3 && frameIdx > 0 && frameIdx < profileSpan.Length - 1)
+            string breakdownText = $"Sharpness: {conf:F2} | Conf: {conf * 100f:F0}%";
+            string transitionText = string.Empty;
+            if (depthRes.FocusVolume != null)
             {
-                neighborMean = (profileSpan[frameIdx - 1] + profileSpan[frameIdx + 1]) * 0.5f;
+                var profileSpan = depthRes.FocusVolume.GetProfile(x, y);
+                float s = conf;
+                float a = Math.Clamp(1.0f - MathF.Abs(depthZ - (float)frameIdx / Math.Max(1, Frames.Count - 1)), 0.1f, 1.0f);
+                float m = _lastResult.MotionResult?.MotionMap != null ? _lastResult.MotionResult.MotionMap.DataPointer[idx] : 0f;
+                float e = Math.Clamp(s * 1.1f, 0.2f, 1.0f);
+
+                float neighborMean = 0f;
+                if (profileSpan.Length >= 3 && frameIdx > 0 && frameIdx < profileSpan.Length - 1)
+                {
+                    neighborMean = (profileSpan[frameIdx - 1] + profileSpan[frameIdx + 1]) * 0.5f;
+                }
+                float cons = profileSpan.Length >= 3 && profileSpan[frameIdx] > neighborMean * 1.8f && neighborMean > 0
+                    ? Math.Clamp((2f * neighborMean) / (profileSpan[frameIdx] + neighborMean + 1e-5f), 0.05f, 1.0f)
+                    : 1.0f;
+
+                float total = s * (0.35f + 0.65f * a) * (0.2f + 0.8f * (1f - Math.Clamp(m * 1.5f, 0f, 0.95f))) * (0.4f + 0.6f * e) * cons;
+                breakdownText = $"S:{s:F2} | A:{a:F2} | M:{m:F2} | E:{e:F2} | Cons:{cons:F2} => Conf:{total:F2}";
+
+                var fitter = new FImageStack.Core.FocusVolume.FocusTransitionFitter();
+                var model = fitter.FitTransition(profileSpan);
+                transitionText = $"Gaussian Model: μ: {model.OptimalMu:F2} | σ: {model.TransitionSpread:F2} slices | A: {model.PeakAmplitude:F2} | R²: {model.GoodnessOfFit * 100f:F0}%";
             }
-            float cons = profileSpan.Length >= 3 && profileSpan[frameIdx] > neighborMean * 1.8f && neighborMean > 0
-                ? Math.Clamp((2f * neighborMean) / (profileSpan[frameIdx] + neighborMean + 1e-5f), 0.05f, 1.0f)
-                : 1.0f;
 
-            float total = s * (0.35f + 0.65f * a) * (0.2f + 0.8f * (1f - Math.Clamp(m * 1.5f, 0f, 0.95f))) * (0.4f + 0.6f * e) * cons;
-            breakdownText = $"S:{s:F2} | A:{a:F2} | M:{m:F2} | E:{e:F2} | Cons:{cons:F2} => Conf:{total:F2}";
-
-            var fitter = new FImageStack.Core.FocusVolume.FocusTransitionFitter();
-            var model = fitter.FitTransition(profileSpan);
-            transitionText = $"Gaussian Model: μ: {model.OptimalMu:F2} | σ: {model.TransitionSpread:F2} slices | A: {model.PeakAmplitude:F2} | R²: {model.GoodnessOfFit * 100f:F0}%";
+            InspectorInfo = new PixelInspectorInfo
+            {
+                PixelX = x,
+                PixelY = y,
+                SourceFrameIndex = frameIdx,
+                SourceFrameFileName = fileName,
+                SubFrameIndex = subFrame,
+                DepthZ = depthZ,
+                DofThickness = dofVal,
+                ConfidencePercentage = conf * 100f,
+                IsValidFocus = isValid,
+                StatusBadge = isValid ? "✅ In-Focus" : (isGap ? "⚠️ Focus Gap" : "⚠️ Bokeh / Low Texture"),
+                FocusCurveSummary = curveSummary,
+                ConfidenceBreakdownText = breakdownText,
+                TransitionModelText = transitionText
+            };
         }
-
-        InspectorInfo = new PixelInspectorInfo
+        catch (Exception ex)
         {
-            PixelX = x,
-            PixelY = y,
-            SourceFrameIndex = frameIdx,
-            SourceFrameFileName = fileName,
-            SubFrameIndex = subFrame,
-            DepthZ = depthZ,
-            DofThickness = dofVal,
-            ConfidencePercentage = conf * 100f,
-            IsValidFocus = isValid,
-            StatusBadge = isValid ? "✅ In-Focus" : (isGap ? "⚠️ Focus Gap" : "⚠️ Bokeh / Low Texture"),
-            FocusCurveSummary = curveSummary,
-            ConfidenceBreakdownText = breakdownText,
-            TransitionModelText = transitionText
-        };
+            System.Diagnostics.Debug.WriteLine($"Inspect pixel notice: {ex.Message}");
+        }
     }
 
     private void ApplyPreset(StackingPreset preset)
@@ -1507,25 +1585,33 @@ public sealed class MainViewModel : ViewModelBase
 
     public void LoadFolder(string folderPath)
     {
-        Frames.Clear();
-        var files = _projectService.DiscoverImageFiles(folderPath);
-        for (int i = 0; i < files.Count; i++)
+        try
         {
-            Frames.Add(new FrameItemViewModel(files[i], i));
-        }
+            Frames.Clear();
+            var files = _projectService.DiscoverImageFiles(folderPath);
+            for (int i = 0; i < files.Count; i++)
+            {
+                Frames.Add(new FrameItemViewModel(files[i], i));
+            }
 
-        if (Frames.Count > 0)
-        {
-            SelectedFrame = Frames[0];
-            StatusMessage = $"Loaded {Frames.Count} frames from {Path.GetFileName(folderPath)}";
-            _ = AnalyzeStackQualityAsync();
-        }
-        else
-        {
-            StatusMessage = "No valid image frames found in selected folder.";
-        }
+            if (Frames.Count > 0)
+            {
+                SelectedFrame = Frames[0];
+                StatusMessage = $"Loaded {Frames.Count} frames from {Path.GetFileName(folderPath)}";
+                _ = AnalyzeStackQualityAsync();
+            }
+            else
+            {
+                StatusMessage = "No valid image frames found in selected folder.";
+            }
 
-        (StartStackingCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+            (StartStackingCommand as AsyncRelayCommand)?.RaiseCanExecuteChanged();
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Folder loading error: {ex.Message}";
+            MessageBox.Show($"Failed to load images from folder:\n{ex.Message}", "Load Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private async Task ExecuteStartStackingAsync(ResolutionMode? overrideMode = null)
@@ -1660,33 +1746,40 @@ public sealed class MainViewModel : ViewModelBase
 
     private void ApplyLivePostProcessing()
     {
-        if (_lastResult == null) return;
-
-        var baseImg = _lastResult.RepairedImage ?? _lastResult.FusedImage;
-        _postProcessedBuffer?.Dispose();
-
-        var ppSettings = new PostProcessSettings
+        try
         {
-            Exposure = ExposureCompensation,
-            Contrast = ContrastAdjustment,
-            Clarity = ClarityAdjustment,
-            SharpenAmount = SharpeningAdjustment,
-            Saturation = SaturationAdjustment,
-            ToneMapping = SelectedToneMapping
-        };
+            if (_lastResult == null) return;
 
-        _postProcessedBuffer = _postProcessEngine.ApplyPostProcessing(baseImg, ppSettings);
-        FusedBitmap = BitmapHelper.ToBitmapSource(_postProcessedBuffer);
+            var baseImg = _lastResult.RepairedImage ?? _lastResult.FusedImage;
+            _postProcessedBuffer?.Dispose();
 
-        // Update live histogram
-        var hist = HistogramEngine.Compute(_postProcessedBuffer);
-        HistogramBitmap = BitmapHelper.RenderHistogramBitmap(hist);
-        ShadowClippingText = $"{hist.ShadowClippingPercent:F1}%";
-        HighlightClippingText = $"{hist.HighlightClippingPercent:F1}%";
+            var ppSettings = new PostProcessSettings
+            {
+                Exposure = ExposureCompensation,
+                Contrast = ContrastAdjustment,
+                Clarity = ClarityAdjustment,
+                SharpenAmount = SharpeningAdjustment,
+                Saturation = SaturationAdjustment,
+                ToneMapping = SelectedToneMapping
+            };
 
-        if (SelectedViewTab == 0 || SelectedViewTab == 1)
+            _postProcessedBuffer = _postProcessEngine.ApplyPostProcessing(baseImg, ppSettings);
+            FusedBitmap = BitmapHelper.ToBitmapSource(_postProcessedBuffer);
+
+            // Update live histogram
+            var hist = HistogramEngine.Compute(_postProcessedBuffer);
+            HistogramBitmap = BitmapHelper.RenderHistogramBitmap(hist);
+            ShadowClippingText = $"{hist.ShadowClippingPercent:F1}%";
+            HighlightClippingText = $"{hist.HighlightClippingPercent:F1}%";
+
+            if (SelectedViewTab == 0 || SelectedViewTab == 1)
+            {
+                UpdateDisplayBitmap();
+            }
+        }
+        catch (Exception ex)
         {
-            UpdateDisplayBitmap();
+            System.Diagnostics.Debug.WriteLine($"Post processing notice: {ex.Message}");
         }
     }
 
@@ -1708,49 +1801,90 @@ public sealed class MainViewModel : ViewModelBase
 
         if (saveDialog.ShowDialog() == true)
         {
-            var img = _postProcessedBuffer ?? _lastResult.RepairedImage ?? _lastResult.FusedImage;
-            int bitDepth = saveDialog.FilterIndex switch
+            try
             {
-                1 => 16,
-                2 => 32,
-                3 => 16,
-                _ => 8
-            };
-            _imageIO.SaveImage(img, saveDialog.FileName, bitDepth);
-            MessageBox.Show($"Exported successfully ({bitDepth}-bit) to:\n{saveDialog.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
+                var img = _postProcessedBuffer ?? _lastResult.RepairedImage ?? _lastResult.FusedImage;
+                int bitDepth = saveDialog.FilterIndex switch
+                {
+                    1 => 16,
+                    2 => 32,
+                    3 => 16,
+                    _ => 8
+                };
+                _imageIO.SaveImage(img, saveDialog.FileName, bitDepth);
+                MessageBox.Show($"Exported successfully ({bitDepth}-bit) to:\n{saveDialog.FileName}", "Export Successful", MessageBoxButton.OK, MessageBoxImage.Information);
+                StatusMessage = $"Exported master image to {Path.GetFileName(saveDialog.FileName)}";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Export Error: {ex.Message}";
+                MessageBox.Show($"Failed to export master image:\n{ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
     }
 
     private void UpdateDisplayBitmap()
     {
-        if (SelectedViewTab == 1)
+        try
         {
-            // Split A/B Comparison: Fused (Left) vs Selected Source Frame (Right)
-            if (_postProcessedBuffer != null && SelectedFrame != null && File.Exists(SelectedFrame.FilePath))
+            if (SelectedViewTab == 1)
             {
-                using var srcFrame = _imageIO.LoadFrame(SelectedFrame.FilePath, SelectedFrame.Index);
-                DisplayBitmap = BitmapHelper.CreateSplitWipeComposite(_postProcessedBuffer, srcFrame.ColorBuffer, (float)SplitRatio);
+                // Split A/B Comparison: Fused (Left) vs Selected Source Frame (Right)
+                if (_postProcessedBuffer != null && SelectedFrame != null && File.Exists(SelectedFrame.FilePath))
+                {
+                    try
+                    {
+                        using var srcFrame = _imageIO.LoadFrame(SelectedFrame.FilePath, SelectedFrame.Index);
+                        DisplayBitmap = BitmapHelper.CreateSplitWipeComposite(_postProcessedBuffer, srcFrame.ColorBuffer, (float)SplitRatio);
+                    }
+                    catch
+                    {
+                        DisplayBitmap = FusedBitmap;
+                    }
+                }
+                else
+                {
+                    DisplayBitmap = FusedBitmap;
+                }
+                return;
             }
-            else
-            {
-                DisplayBitmap = FusedBitmap;
-            }
-            return;
-        }
 
-        DisplayBitmap = SelectedViewTab switch
+            DisplayBitmap = SelectedViewTab switch
+            {
+                0 => FusedBitmap,
+                1 => FusedBitmap,
+                2 => TurboDepthBitmap,
+                3 => ConfidenceMapBitmap,
+                4 => InvalidRegionBitmap,
+                5 => MotionMapBitmap,
+                6 => ArtifactMapBitmap,
+                7 => SelectedFrame != null && File.Exists(SelectedFrame.FilePath) ? LoadBitmapImageSafe(SelectedFrame.FilePath) : null,
+                8 => DofThicknessBitmap,
+                10 => VirtualDofBitmap ?? FusedBitmap,
+                _ => FusedBitmap
+            };
+        }
+        catch (Exception ex)
         {
-            0 => FusedBitmap,
-            1 => FusedBitmap,
-            2 => TurboDepthBitmap,
-            3 => ConfidenceMapBitmap,
-            4 => InvalidRegionBitmap,
-            5 => MotionMapBitmap,
-            6 => ArtifactMapBitmap,
-            7 => SelectedFrame != null && File.Exists(SelectedFrame.FilePath) ? new BitmapImage(new Uri(SelectedFrame.FilePath, UriKind.Absolute)) : null,
-            8 => DofThicknessBitmap,
-            10 => VirtualDofBitmap ?? FusedBitmap,
-            _ => FusedBitmap
-        };
+            System.Diagnostics.Debug.WriteLine($"UpdateDisplayBitmap notice: {ex.Message}");
+        }
+    }
+
+    private static BitmapImage? LoadBitmapImageSafe(string path)
+    {
+        try
+        {
+            var bi = new BitmapImage();
+            bi.BeginInit();
+            bi.CacheOption = BitmapCacheOption.OnLoad;
+            bi.UriSource = new Uri(path, UriKind.Absolute);
+            bi.EndInit();
+            bi.Freeze();
+            return bi;
+        }
+        catch
+        {
+            return null;
+        }
     }
 }
