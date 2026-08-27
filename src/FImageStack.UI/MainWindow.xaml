@@ -436,13 +436,16 @@
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
                             </Grid.ColumnDefinitions>
-                            <RadioButton Grid.Column="0" Content="⚙️ Stack" Style="{StaticResource SidebarTabRadioButton}" IsChecked="{Binding IsSidebarStackTabSelected, Mode=TwoWay}" GroupName="RightSidebarTabs" ToolTip="Stacking Engine, Presets, Algorithms &amp; Hardware" />
-                            <RadioButton Grid.Column="1" Content="🎨 Tone" Style="{StaticResource SidebarTabRadioButton}" IsChecked="{Binding IsSidebarColorTabSelected, Mode=TwoWay}" GroupName="RightSidebarTabs" ToolTip="Color, Clarity, Curves &amp; Histogram" />
-                            <RadioButton Grid.Column="2" Content="🖌️ Retouch" Style="{StaticResource SidebarTabRadioButton}" IsChecked="{Binding IsSidebarRetouchTabSelected, Mode=TwoWay}" GroupName="RightSidebarTabs" ToolTip="Interactive Brush Painting &amp; Manual Override" />
-                            <RadioButton Grid.Column="3" Content="📊 Metrics" Style="{StaticResource SidebarTabRadioButton}" IsChecked="{Binding IsSidebarMetricsTabSelected, Mode=TwoWay}" GroupName="RightSidebarTabs" ToolTip="Quality Scores, Artifacts &amp; Performance" />
+                            <RadioButton Grid.Column="0" Content="⚙️ Stack" Style="{StaticResource SidebarTabRadioButton}" IsChecked="{Binding IsSidebarStackTabSelected, Mode=TwoWay}" GroupName="RightSidebarTabs" ToolTip="Focus Stacking Engine, Presets &amp; Algorithms" />
+                            <RadioButton Grid.Column="1" Content="🔬 Modes" Style="{StaticResource SidebarTabRadioButton}" IsChecked="{Binding IsSidebarModesTabSelected, Mode=TwoWay}" GroupName="RightSidebarTabs" ToolTip="HDR, Noise Stacking, Astro, Drizzle &amp; 3D" />
+                            <RadioButton Grid.Column="2" Content="🎨 Tone" Style="{StaticResource SidebarTabRadioButton}" IsChecked="{Binding IsSidebarColorTabSelected, Mode=TwoWay}" GroupName="RightSidebarTabs" ToolTip="Color, Clarity, Curves &amp; Histogram" />
+                            <RadioButton Grid.Column="3" Content="🖌️ Retouch" Style="{StaticResource SidebarTabRadioButton}" IsChecked="{Binding IsSidebarRetouchTabSelected, Mode=TwoWay}" GroupName="RightSidebarTabs" ToolTip="Interactive Brush Painting &amp; Manual Override" />
+                            <RadioButton Grid.Column="4" Content="📊 Metrics" Style="{StaticResource SidebarTabRadioButton}" IsChecked="{Binding IsSidebarMetricsTabSelected, Mode=TwoWay}" GroupName="RightSidebarTabs" ToolTip="Quality Scores, Artifacts &amp; Performance" />
                         </Grid>
                     </Border>
+
 
                     <!-- 2. Active Tab Scrollable Content Area -->
                     <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="12,12,12,6">
@@ -543,8 +546,89 @@
                                 </Border>
                             </StackPanel>
 
-                            <!-- Tab 1: Color, Clarity, Curves & Live Histogram -->
+                            <!-- Tab 1: Computational Imaging Modes & Tools -->
+                            <StackPanel Visibility="{Binding IsSidebarModesTabSelected, Converter={StaticResource BoolToVis}}">
+                                <!-- 1. Computational Photography Mode Selector -->
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="🔬 COMPUTATIONAL PHOTOGRAPHY MODE" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,6" />
+                                        <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedStackType}" Margin="0,0,0,6">
+                                            <ComboBoxItem Content="🔍 Focus Stacking (All-In-Focus &amp; 3D)" Tag="{x:Static core:StackType.FocusStack}" IsSelected="True" />
+                                            <ComboBoxItem Content="✨ Statistical Noise Stacking (Clean +15dB)" Tag="{x:Static core:StackType.NoiseStack}" />
+                                            <ComboBoxItem Content="🌈 Pure HDR Dynamic Range Stacking" Tag="{x:Static core:StackType.HdrStack}" />
+                                            <ComboBoxItem Content="🌌 Astro Deep-Sky Stacking &amp; Alignment" Tag="{x:Static core:StackType.AstroStack}" />
+                                            <ComboBoxItem Content="🔭 HST Subpixel Drizzle Super-Resolution" Tag="{x:Static core:StackType.SuperResolution}" />
+                                        </ComboBox>
+
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 2. Dedicated Parameters Card -->
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <TextBlock Text="⚙️ MODE PARAMETERS" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,8" />
+
+                                        <!-- Noise Parameters -->
+                                        <StackPanel Margin="0,0,0,6">
+                                            <TextBlock Text="Statistical Noise Reduction:" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2" />
+                                            <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedNoiseMethod}" Margin="0,0,0,6">
+                                                <ComboBoxItem Content="Kappa-Sigma Outlier Clipping" Tag="{x:Static core:NoiseStackMethod.KappaSigmaClipping}" IsSelected="True" />
+                                                <ComboBoxItem Content="SIMD Arithmetic Mean (Gaussian)" Tag="{x:Static core:NoiseStackMethod.Mean}" />
+                                                <ComboBoxItem Content="Median (Salt &amp; Pepper / Cosmic)" Tag="{x:Static core:NoiseStackMethod.Median}" />
+                                                <ComboBoxItem Content="Winsorized Mean" Tag="{x:Static core:NoiseStackMethod.WinsorizedMean}" />
+                                            </ComboBox>
+                                            <Grid Margin="0,0,0,1">
+                                                <TextBlock Text="Kappa Rejection Multiplier (κ):" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                                <TextBlock Text="{Binding KappaThreshold, StringFormat='{}{0:F1}σ'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11" />
+                                            </Grid>
+                                            <Slider Minimum="1.0" Maximum="5.0" Value="{Binding KappaThreshold}" SmallChange="0.1" Margin="0,0,0,6" />
+                                        </StackPanel>
+
+                                        <!-- HDR Parameters -->
+                                        <StackPanel Margin="0,0,0,6">
+                                            <TextBlock Text="HDR Radiance Merge Strategy:" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2" />
+                                            <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedHdrMethod}" Margin="0,0,0,6">
+                                                <ComboBoxItem Content="Mertens Multi-Exposure Fusion" Tag="{x:Static core:HdrMergeMethod.MertensFusion}" IsSelected="True" />
+                                                <ComboBoxItem Content="Debevec Physical Radiance Map" Tag="{x:Static core:HdrMergeMethod.DebevecRadiance}" />
+                                            </ComboBox>
+                                            <CheckBox Content="Adaptive Motion Deghosting" IsChecked="{Binding HdrDeghosting}" FontSize="11" Margin="0,0,0,6" />
+                                        </StackPanel>
+
+                                        <!-- Drizzle Parameters -->
+                                        <StackPanel Margin="0,0,0,6">
+                                            <Grid Margin="0,0,0,1">
+                                                <TextBlock Text="Drizzle Upsampling Scale:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                                <TextBlock Text="{Binding DrizzleScale, StringFormat='{}{0:F1}x'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11" />
+                                            </Grid>
+                                            <Slider Minimum="1.0" Maximum="4.0" Value="{Binding DrizzleScale}" SmallChange="0.5" Margin="0,0,0,6" />
+
+                                            <Grid Margin="0,0,0,1">
+                                                <TextBlock Text="Pixel Drop Fraction (pixfrac):" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                                <TextBlock Text="{Binding DrizzlePixFrac, StringFormat='{}{0:F2}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11" />
+                                            </Grid>
+                                            <Slider Minimum="0.2" Maximum="1.0" Value="{Binding DrizzlePixFrac}" SmallChange="0.05" Margin="0,0,0,6" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <!-- 3. Optical Restoration & 3D Export Card -->
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6">
+                                    <StackPanel>
+                                        <TextBlock Text="🌌 RESTORATION &amp; 3D EXPORT" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,8" />
+                                        
+                                        <Button Content="🌫️ Dehaze Output (Dark Channel)" Style="{StaticResource ModernButton}" Command="{Binding DehazeCommand}" Margin="0,0,0,6" Padding="8,5" FontWeight="SemiBold" />
+                                        <Button Content="🔍 Optical Deconvolution (Richardson-Lucy)" Style="{StaticResource ModernButton}" Command="{Binding DeconvolveCommand}" Margin="0,0,0,10" Padding="8,5" FontWeight="SemiBold" />
+
+                                        <Separator Background="{StaticResource BorderDefault}" Margin="0,0,0,8" />
+                                        <TextBlock Text="3D Geometry Reconstruction:" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,4" />
+                                        <Button Content="📐 Export 3D Mesh (.OBJ / .PLY)..." Style="{StaticResource ModernButton}" Command="{Binding Export3dMeshCommand}" Background="#064E3B" BorderBrush="#10B981" Foreground="#ECFDF5" FontWeight="Bold" Padding="10,6" ToolTip="Export 3D Point Cloud or Surface Mesh with Sobel Normals and Color mapping" />
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Tab 2: Color, Clarity, Curves & Live Histogram -->
                             <StackPanel Visibility="{Binding IsSidebarColorTabSelected, Converter={StaticResource BoolToVis}}">
+
                                 <!-- 1. Live Dynamic Histogram Card -->
                                 <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
                                     <StackPanel>

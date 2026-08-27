@@ -7,20 +7,28 @@ using System.Windows.Media.Imaging;
 using FImageStack.Application.Services;
 using FImageStack.Core;
 using FImageStack.Core.Acceleration;
+using FImageStack.Core.Astro;
+using FImageStack.Core.Depth3D;
+using FImageStack.Core.Hdr;
 using FImageStack.Core.Lab;
 using FImageStack.Core.Models;
+using FImageStack.Core.Noise;
 using FImageStack.Core.PostProcessing;
 using FImageStack.Core.Presets;
 using FImageStack.Core.Project;
 using FImageStack.Core.Quality;
+using FImageStack.Core.Raw;
 using FImageStack.Core.Refocus;
+using FImageStack.Core.Restoration;
 using FImageStack.Core.Retouch;
 using FImageStack.Core.Selection;
+using FImageStack.Core.SuperResolution.Drizzle;
 using FImageStack.Infrastructure.IO;
 using FImageStack.UI.Common;
 using FImageStack.UI.Utils;
 using Microsoft.Win32;
 using StackFrame = FImageStack.Core.Models.StackFrame;
+
 
 namespace FImageStack.UI.ViewModels;
 
@@ -726,6 +734,7 @@ public sealed class MainViewModel : ViewModelBase
             if (SetProperty(ref _selectedSidebarTab, value))
             {
                 OnPropertyChanged(nameof(IsSidebarStackTabSelected));
+                OnPropertyChanged(nameof(IsSidebarModesTabSelected));
                 OnPropertyChanged(nameof(IsSidebarColorTabSelected));
                 OnPropertyChanged(nameof(IsSidebarRetouchTabSelected));
                 OnPropertyChanged(nameof(IsSidebarMetricsTabSelected));
@@ -739,23 +748,58 @@ public sealed class MainViewModel : ViewModelBase
         set { if (value) SelectedSidebarTab = 0; }
     }
 
-    public bool IsSidebarColorTabSelected
+    public bool IsSidebarModesTabSelected
     {
         get => _selectedSidebarTab == 1;
         set { if (value) SelectedSidebarTab = 1; }
     }
 
-    public bool IsSidebarRetouchTabSelected
+    public bool IsSidebarColorTabSelected
     {
         get => _selectedSidebarTab == 2;
         set { if (value) SelectedSidebarTab = 2; }
     }
 
-    public bool IsSidebarMetricsTabSelected
+    public bool IsSidebarRetouchTabSelected
     {
         get => _selectedSidebarTab == 3;
         set { if (value) SelectedSidebarTab = 3; }
     }
+
+    public bool IsSidebarMetricsTabSelected
+    {
+        get => _selectedSidebarTab == 4;
+        set { if (value) SelectedSidebarTab = 4; }
+    }
+
+    // Computational Photography Mode Parameters
+    private StackType _selectedStackType = StackType.FocusStack;
+    private NoiseStackMethod _selectedNoiseMethod = NoiseStackMethod.KappaSigmaClipping;
+
+    private float _kappaThreshold = 2.5f;
+    private HdrMergeMethod _selectedHdrMethod = HdrMergeMethod.MertensFusion;
+    private bool _hdrDeghosting = true;
+    private float _drizzleScale = 2.0f;
+    private float _drizzlePixFrac = 0.70f;
+    private float _dehazeStrength = 0.95f;
+    private float _deconvolutionRadius = 2.0f;
+    private int _deconvolutionIterations = 20;
+
+    public StackType SelectedStackType { get => _selectedStackType; set => SetProperty(ref _selectedStackType, value); }
+    public NoiseStackMethod SelectedNoiseMethod { get => _selectedNoiseMethod; set => SetProperty(ref _selectedNoiseMethod, value); }
+    public float KappaThreshold { get => _kappaThreshold; set => SetProperty(ref _kappaThreshold, value); }
+    public HdrMergeMethod SelectedHdrMethod { get => _selectedHdrMethod; set => SetProperty(ref _selectedHdrMethod, value); }
+    public bool HdrDeghosting { get => _hdrDeghosting; set => SetProperty(ref _hdrDeghosting, value); }
+    public float DrizzleScale { get => _drizzleScale; set => SetProperty(ref _drizzleScale, value); }
+    public float DrizzlePixFrac { get => _drizzlePixFrac; set => SetProperty(ref _drizzlePixFrac, value); }
+    public float DehazeStrength { get => _dehazeStrength; set => SetProperty(ref _dehazeStrength, value); }
+    public float DeconvolutionRadius { get => _deconvolutionRadius; set => SetProperty(ref _deconvolutionRadius, value); }
+    public int DeconvolutionIterations { get => _deconvolutionIterations; set => SetProperty(ref _deconvolutionIterations, value); }
+
+    public ICommand? Export3dMeshCommand { get; private set; }
+    public ICommand? DehazeCommand { get; private set; }
+    public ICommand? DeconvolveCommand { get; private set; }
+
 
     // Zoom & Pan System
     private double _zoomScale = 1.0;
@@ -924,7 +968,11 @@ public sealed class MainViewModel : ViewModelBase
         ApplyVirtualDofCommand = new AsyncRelayCommand(ExecuteApplyVirtualDofAsync, () => _lastResult != null && !IsProcessing);
         RunStackLabCommand = new AsyncRelayCommand(ExecuteRunStackLabAsync, () => !IsProcessing && Frames.Count >= 2);
         SelectLabWinnerCommand = new RelayCommand(param => ExecuteSelectLabWinner(param as StackLabSlot));
+        Export3dMeshCommand = new AsyncRelayCommand(ExecuteExport3dMeshAsync, () => _lastResult?.DepthResult?.DepthMap != null && !IsProcessing);
+        DehazeCommand = new AsyncRelayCommand(ExecuteDehazeAsync, () => _lastResult != null && !IsProcessing);
+        DeconvolveCommand = new AsyncRelayCommand(ExecuteDeconvolveAsync, () => _lastResult != null && !IsProcessing);
     }
+
 
     public async Task AnalyzeStackQualityAsync()
     {
@@ -1628,26 +1676,6 @@ public sealed class MainViewModel : ViewModelBase
         IsProcessing = true;
         _cts = new CancellationTokenSource();
 
-        var settings = new FusionSettings
-        {
-            Method = SelectedMethod,
-            FocusMethod = SelectedFocusMethod,
-            AlignmentMode = SelectedAlignmentMode,
-            PyramidLevels = PyramidLevels,
-            SmoothingRadius = SmoothingRadius,
-            EnableDepthSmoothing = true,
-            EnableQualityAnalysis = EnableQualityAnalysis,
-            EnableMotionSuppression = EnableMotionSuppression,
-            EnableArtifactDetection = EnableArtifactDetection,
-            EnableAutoRepair = EnableAutoRepair,
-            EnableLocalAlignment = EnableLocalAlignment,
-            EnableEdgeReconstruction = EnableEdgeReconstruction,
-            EnableTiledProcessing = EnableTiledProcessing,
-            TileSize = _tileSize,
-            RenderMode = SelectedRenderMode,
-            PreviewMaxDimension = 1280
-        };
-
         var progress = new Progress<StackProgress>(p =>
         {
             System.Windows.Application.Current.Dispatcher.Invoke(() =>
@@ -1665,62 +1693,127 @@ public sealed class MainViewModel : ViewModelBase
             _postProcessedBuffer = null;
             _retouchLayer?.Dispose();
 
-            var result = await _stackService.ProcessStackAsync(activeFiles, settings, progress, _cts.Token);
-            _lastResult = result;
-            _retouchLayer = new RetouchLayer(result.FusedImage.Width, result.FusedImage.Height);
-            UpdateRetouchStrokesCount();
-
-            // Generate Bitmaps
-            ApplyLivePostProcessing();
-
-            TurboDepthBitmap = BitmapHelper.ToTurboColormapBitmap(result.DepthResult.DepthMap, result.DepthResult.ConfidenceMap);
-            ConfidenceMapBitmap = BitmapHelper.ToBitmapSource(result.DepthResult.ConfidenceMap);
-            InvalidRegionBitmap = BitmapHelper.ToInvalidRegionBitmap(result.DepthResult.ConfidenceMap);
-            DofThicknessBitmap = BitmapHelper.ToDofThicknessBitmap(result.DepthResult.DofMap, result.DepthResult.ConfidenceMap);
-            MotionMapBitmap = BitmapHelper.ToBitmapSource(result.MotionResult?.MotionMap);
-            ArtifactMapBitmap = BitmapHelper.ToBitmapSource(result.ArtifactMap?.ArtifactMask);
-
-            // Update Metrics
-            var b = result.Benchmark;
-            TimingText = $"{b.TotalTimeMs / 1000.0:F2}s (Fusion: {b.FusionTimeMs:F0}ms)";
-            MemoryUsageText = $"{b.PeakWorkingSetMb} MB";
-
-            if (result.QualityReport != null)
+            if (SelectedStackType == StackType.NoiseStack)
             {
-                QualityScoreText = $"{result.QualityReport.OverallScore:F1}% ({result.QualityReport.FocusCoverageRating})";
-                FocusCoverageText = $"{result.QualityReport.FocusCoveragePercentage:F1}% (Gaps: {result.QualityReport.DetectedGaps.Count})";
-
-                MetricAlignmentScore = result.QualityReport.AlignmentScore;
-                MetricFocusCoverageScore = result.QualityReport.FocusCoverageScore;
-                MetricGhostingPercent = result.QualityReport.GhostingPercent;
-                MetricHaloPercent = result.QualityReport.HaloPercent;
-                MetricNoisePercent = result.QualityReport.NoisePercent;
-                MetricEdgeQualityScore = result.QualityReport.EdgeQualityScore;
-
-                DetectedArtifactRegions.Clear();
-                foreach (var a in result.QualityReport.TopArtifacts)
+                var nSettings = new NoiseStackSettings { Method = SelectedNoiseMethod, Kappa = KappaThreshold };
+                using var nRes = await _stackService.ProcessNoiseStackAsync(activeFiles, nSettings, SelectedAlignmentMode, progress, _cts.Token);
+                _lastResult = new ProcessedStackResult(nRes.DenoisedImage.Width, nRes.DenoisedImage.Height)
                 {
-                    DetectedArtifactRegions.Add(new ArtifactRegionViewModel
+                    FusedImage = nRes.DenoisedImage.Clone(),
+                    Benchmark = new BenchmarkReport { Width = nRes.DenoisedImage.Width, Height = nRes.DenoisedImage.Height, FrameCount = activeFiles.Count }
+                };
+                StatusMessage = $"Noise Stacking Complete! SNR Gain: +{nRes.EstimatedSnrImprovementDb:F1} dB across {activeFiles.Count} frames.";
+            }
+            else if (SelectedStackType == StackType.HdrStack)
+            {
+                var hSettings = new HdrStackSettings { Method = SelectedHdrMethod, EnableDeghosting = HdrDeghosting };
+                using var hRes = await _stackService.ProcessHdrStackAsync(activeFiles, hSettings, SelectedAlignmentMode, progress, _cts.Token);
+                _lastResult = new ProcessedStackResult(hRes.ToneMappedImage.Width, hRes.ToneMappedImage.Height)
+                {
+                    FusedImage = hRes.ToneMappedImage.Clone(),
+                    Benchmark = new BenchmarkReport { Width = hRes.ToneMappedImage.Width, Height = hRes.ToneMappedImage.Height, FrameCount = activeFiles.Count }
+                };
+                StatusMessage = $"HDR Stacking Complete! Dynamic Range: {hRes.EstimatedDynamicRangeEv:F1} EV.";
+            }
+            else if (SelectedStackType == StackType.AstroStack)
+
+            {
+                var aSettings = new AstroStackSettings { Kappa = KappaThreshold };
+                using var aRes = await _stackService.ProcessAstroStackAsync(activeFiles, aSettings, null, progress, _cts.Token);
+                _lastResult = new ProcessedStackResult(aRes.StackedImage.Width, aRes.StackedImage.Height)
+                {
+                    FusedImage = aRes.StackedImage.Clone(),
+                    Benchmark = new BenchmarkReport { Width = aRes.StackedImage.Width, Height = aRes.StackedImage.Height, FrameCount = activeFiles.Count }
+                };
+                StatusMessage = $"Astro Stacking Complete! Registered {aRes.TotalLightsMerged} light frames.";
+            }
+            else if (SelectedStackType == StackType.SuperResolution)
+            {
+                var dSettings = new DrizzleSettings { ScaleFactor = DrizzleScale, PixFrac = DrizzlePixFrac };
+                using var dRes = await _stackService.ProcessDrizzleSuperResAsync(activeFiles, dSettings, SelectedAlignmentMode, progress, _cts.Token);
+                _lastResult = new ProcessedStackResult(dRes.SuperResolvedImage.Width, dRes.SuperResolvedImage.Height)
+                {
+                    FusedImage = dRes.SuperResolvedImage.Clone(),
+                    Benchmark = new BenchmarkReport { Width = dRes.SuperResolvedImage.Width, Height = dRes.SuperResolvedImage.Height, FrameCount = activeFiles.Count }
+                };
+                StatusMessage = $"HST Drizzle Super-Resolution Complete! Upscaled {dRes.EffectiveScale:F1}x.";
+            }
+            else
+            {
+                // Standard Focus Stacking
+                var settings = new FusionSettings
+                {
+                    Method = SelectedMethod,
+                    FocusMethod = SelectedFocusMethod,
+                    AlignmentMode = SelectedAlignmentMode,
+                    PyramidLevels = PyramidLevels,
+                    SmoothingRadius = SmoothingRadius,
+                    EnableDepthSmoothing = true,
+                    EnableQualityAnalysis = EnableQualityAnalysis,
+                    EnableMotionSuppression = EnableMotionSuppression,
+                    EnableArtifactDetection = EnableArtifactDetection,
+                    EnableAutoRepair = EnableAutoRepair,
+                    EnableLocalAlignment = EnableLocalAlignment,
+                    EnableEdgeReconstruction = EnableEdgeReconstruction,
+                    EnableTiledProcessing = EnableTiledProcessing,
+                    TileSize = _tileSize,
+                    RenderMode = SelectedRenderMode,
+                    PreviewMaxDimension = 1280
+                };
+
+                var result = await _stackService.ProcessStackAsync(activeFiles, settings, progress, _cts.Token);
+                _lastResult = result;
+
+                TurboDepthBitmap = BitmapHelper.ToTurboColormapBitmap(result.DepthResult.DepthMap, result.DepthResult.ConfidenceMap);
+                ConfidenceMapBitmap = BitmapHelper.ToBitmapSource(result.DepthResult.ConfidenceMap);
+                InvalidRegionBitmap = BitmapHelper.ToInvalidRegionBitmap(result.DepthResult.ConfidenceMap);
+                DofThicknessBitmap = BitmapHelper.ToDofThicknessBitmap(result.DepthResult.DofMap, result.DepthResult.ConfidenceMap);
+                MotionMapBitmap = BitmapHelper.ToBitmapSource(result.MotionResult?.MotionMap);
+                ArtifactMapBitmap = BitmapHelper.ToBitmapSource(result.ArtifactMap?.ArtifactMask);
+
+                var b = result.Benchmark;
+                TimingText = $"{b.TotalTimeMs / 1000.0:F2}s (Fusion: {b.FusionTimeMs:F0}ms)";
+                MemoryUsageText = $"{b.PeakWorkingSetMb} MB";
+
+                if (result.QualityReport != null)
+                {
+                    QualityScoreText = $"{result.QualityReport.OverallScore:F1}% ({result.QualityReport.FocusCoverageRating})";
+                    FocusCoverageText = $"{result.QualityReport.FocusCoveragePercentage:F1}% (Gaps: {result.QualityReport.DetectedGaps.Count})";
+
+                    MetricAlignmentScore = result.QualityReport.AlignmentScore;
+                    MetricFocusCoverageScore = result.QualityReport.FocusCoverageScore;
+                    MetricGhostingPercent = result.QualityReport.GhostingPercent;
+                    MetricHaloPercent = result.QualityReport.HaloPercent;
+                    MetricNoisePercent = result.QualityReport.NoisePercent;
+                    MetricEdgeQualityScore = result.QualityReport.EdgeQualityScore;
+
+                    DetectedArtifactRegions.Clear();
+                    foreach (var a in result.QualityReport.TopArtifacts)
                     {
-                        Id = a.Id,
-                        TypeName = a.TypeName,
-                        CenterX = a.CenterX,
-                        CenterY = a.CenterY,
-                        Severity = a.Severity,
-                        Description = a.Description
-                    });
+                        DetectedArtifactRegions.Add(new ArtifactRegionViewModel
+                        {
+                            Id = a.Id,
+                            TypeName = a.TypeName,
+                            CenterX = a.CenterX,
+                            CenterY = a.CenterY,
+                            Severity = a.Severity,
+                            Description = a.Description
+                        });
+                    }
+                }
+
+                if (result.ArtifactMap != null)
+                {
+                    int repaired = result.RepairReport?.RepairedRegionsCount ?? 0;
+                    ArtifactsReportText = $"Found: {result.ArtifactMap.Regions.Count}, Repaired: {repaired}";
                 }
             }
 
-            if (result.ArtifactMap != null)
-            {
-                int repaired = result.RepairReport?.RepairedRegionsCount ?? 0;
-                ArtifactsReportText = $"Found: {result.ArtifactMap.Regions.Count}, Repaired: {repaired}";
-            }
-
+            _retouchLayer = new RetouchLayer(_lastResult.FusedImage.Width, _lastResult.FusedImage.Height);
+            UpdateRetouchStrokesCount();
+            ApplyLivePostProcessing();
             SelectedViewTab = 0;
             UpdateDisplayBitmap();
-            StatusMessage = $"Completed successfully in {b.TotalTimeMs / 1000.0:F2}s!";
         }
         catch (OperationCanceledException)
         {
@@ -1736,6 +1829,103 @@ public sealed class MainViewModel : ViewModelBase
             IsProcessing = false;
         }
     }
+
+    private async Task ExecuteExport3dMeshAsync()
+    {
+        if (_lastResult?.DepthResult?.DepthMap == null)
+        {
+            MessageBox.Show("Please perform a focus stack first to generate a 3D depth map.", "3D Mesh Export", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        var dialog = new SaveFileDialog
+        {
+            Title = "Export 3D Surface Mesh or Point Cloud",
+            Filter = "Wavefront OBJ 3D Mesh (*.obj)|*.obj|Stanford PLY Point Cloud (*.ply)|*.ply",
+            FileName = "stack_surface_mesh.obj"
+        };
+
+        if (dialog.ShowDialog() == true)
+        {
+            try
+            {
+                StatusMessage = $"Exporting 3D geometry to {Path.GetFileName(dialog.FileName)}...";
+                var options = new DepthMeshOptions
+                {
+                    Format = dialog.FileName.EndsWith(".ply", StringComparison.OrdinalIgnoreCase)
+                        ? MeshExportFormat.PlyPointCloud
+                        : MeshExportFormat.ObjSurfaceMesh,
+                    ZScale = 100.0f,
+                    DecimationStep = 2
+                };
+
+                await _stackService.ExportDepthMeshAsync(
+                    _lastResult.DepthResult.DepthMap,
+                    _lastResult.RepairedImage ?? _lastResult.FusedImage,
+                    dialog.FileName,
+                    options);
+
+                StatusMessage = $"3D Model exported successfully to {dialog.FileName}!";
+                MessageBox.Show($"3D Model exported successfully:\n{dialog.FileName}", "3D Export", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Failed to export 3D geometry:\n{ex.Message}", "Export Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+    }
+
+    private async Task ExecuteDehazeAsync()
+    {
+        if (_lastResult?.FusedImage == null) return;
+        IsProcessing = true;
+        StatusMessage = "Applying Dark Channel Prior Dehazing...";
+        try
+        {
+            var res = await _stackService.DehazeImageAsync(_lastResult.FusedImage, new DehazeOptions { Omega = DehazeStrength });
+            _lastResult.FusedImage.Dispose();
+            _lastResult.FusedImage = res.DehazedImage.Clone();
+            ApplyLivePostProcessing();
+            StatusMessage = "Image Dehazing complete.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Dehaze error: {ex.Message}";
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+
+    private async Task ExecuteDeconvolveAsync()
+
+    {
+        if (_lastResult?.FusedImage == null) return;
+        IsProcessing = true;
+        StatusMessage = "Applying Richardson-Lucy Optical Deconvolution...";
+        try
+        {
+            var res = await _stackService.DeconvolveImageAsync(_lastResult.FusedImage, new DeconvolutionOptions
+            {
+                PsfRadius = DeconvolutionRadius,
+                Iterations = DeconvolutionIterations
+            });
+            _lastResult.FusedImage.Dispose();
+            _lastResult.FusedImage = res;
+            ApplyLivePostProcessing();
+            StatusMessage = "Richardson-Lucy Deconvolution complete.";
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"Deconvolution error: {ex.Message}";
+        }
+        finally
+        {
+            IsProcessing = false;
+        }
+    }
+
 
     private void ApplyLivePostProcessing()
     {
