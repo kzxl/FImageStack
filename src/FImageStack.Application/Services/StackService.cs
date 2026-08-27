@@ -12,9 +12,11 @@ using FImageStack.Core.Models;
 using FImageStack.Core.Motion;
 using FImageStack.Core.Noise;
 using FImageStack.Core.Quality;
+using FImageStack.Core.Raw;
 using FImageStack.Core.Reconstruction;
 using FImageStack.Core.Restoration;
 using FImageStack.Core.SuperResolution;
+using FImageStack.Core.SuperResolution.Drizzle;
 using FImageStack.Core.Tiling;
 using FImageStack.Infrastructure.IO;
 using StackFrame = FImageStack.Core.Models.StackFrame;
@@ -57,6 +59,19 @@ public interface IStackService
         IProgress<StackProgress>? progress = null,
         CancellationToken cancellationToken = default);
 
+    Task<RawStackResult> ProcessRawStackAsync(
+        IReadOnlyList<RawBayerBuffer> rawFrames,
+        RawStackSettings settings,
+        IProgress<StackProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+
+    Task<DrizzleResult> ProcessDrizzleSuperResAsync(
+        IReadOnlyList<string> filePaths,
+        DrizzleSettings settings,
+        AlignmentMode alignmentMode = AlignmentMode.Similarity,
+        IProgress<StackProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+
     Task<ImageBuffer<float>> DeconvolveImageAsync(
         ImageBuffer<float> input,
         DeconvolutionOptions options);
@@ -94,6 +109,9 @@ public sealed class StackService : IStackService
     private readonly IAstroStackEngine _astroStackEngine;
     private readonly IRichardsonLucyEngine _richardsonLucyEngine;
     private readonly IDehazeEngine _dehazeEngine;
+    private readonly IBayerFusionEngine _bayerFusionEngine;
+    private readonly IDemosaicEngine _demosaicEngine;
+    private readonly IDrizzleEngine _drizzleEngine;
 
     public StackService(
         IImageIO imageIO,
@@ -115,7 +133,10 @@ public sealed class StackService : IStackService
         IDepthMeshExporter? depthMeshExporter = null,
         IAstroStackEngine? astroStackEngine = null,
         IRichardsonLucyEngine? richardsonLucyEngine = null,
-        IDehazeEngine? dehazeEngine = null)
+        IDehazeEngine? dehazeEngine = null,
+        IBayerFusionEngine? bayerFusionEngine = null,
+        IDemosaicEngine? demosaicEngine = null,
+        IDrizzleEngine? drizzleEngine = null)
     {
         _imageIO = imageIO;
         _alignmentEngine = alignmentEngine ?? new AdvancedAlignmentEngine();
@@ -137,7 +158,11 @@ public sealed class StackService : IStackService
         _astroStackEngine = astroStackEngine ?? new AstroStackEngine();
         _richardsonLucyEngine = richardsonLucyEngine ?? new RichardsonLucyEngine();
         _dehazeEngine = dehazeEngine ?? new DehazeEngine();
+        _bayerFusionEngine = bayerFusionEngine ?? new BayerFusionEngine();
+        _demosaicEngine = demosaicEngine ?? new EdgeDirectedDemosaicEngine();
+        _drizzleEngine = drizzleEngine ?? new DrizzleEngine();
     }
+
 
 
 
@@ -628,6 +653,82 @@ public sealed class StackService : IStackService
 
         return await Task.Run(() => _dehazeEngine.Dehaze(input, options));
     }
+
+    public async Task<RawStackResult> ProcessRawStackAsync(
+        IReadOnlyList<RawBayerBuffer> rawFrames,
+        RawStackSettings settings,
+        IProgress<StackProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (rawFrames == null || rawFrames.Count == 0)
+            throw new ArgumentException("RAW frames list cannot be empty.", nameof(rawFrames));
+
+        progress?.Report(new StackProgress("Computational RAW", 0, $"Merging {rawFrames.Count} raw Bayer CFA frames..."));
+
+        return await Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var mergedBayer = _bayerFusionEngine.MergeBayerFrames(rawFrames, settings);
+
+            progress?.Report(new StackProgress("Computational RAW", 50, "Applying Edge-Directed Adaptive Demosaicing..."));
+            cancellationToken.ThrowIfCancellationRequested();
+            var demosaiced = _demosaicEngine.Demosaic(mergedBayer, settings);
+
+            progress?.Report(new StackProgress("Computational RAW", 100, "RAW processing complete."));
+
+            return new RawStackResult(demosaiced, mergedBayer, rawFrames.Count)
+            {
+                EstimatedDynamicRangeEv = 12.5f + (float)Math.Log2(Math.Max(1, rawFrames.Count))
+            };
+        }, cancellationToken);
+    }
+
+    public async Task<DrizzleResult> ProcessDrizzleSuperResAsync(
+        IReadOnlyList<string> filePaths,
+        DrizzleSettings settings,
+        AlignmentMode alignmentMode = AlignmentMode.Similarity,
+        IProgress<StackProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (filePaths == null || filePaths.Count == 0)
+            throw new ArgumentException("Frames list cannot be empty for Drizzle Super-Resolution.", nameof(filePaths));
+
+        progress?.Report(new StackProgress("Loading Frames", 0, $"Loading {filePaths.Count} frames for Drizzle..."));
+        var frames = new List<StackFrame>(filePaths.Count);
+
+        for (int i = 0; i < filePaths.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var frame = await Task.Run(() => _imageIO.LoadFrame(filePaths[i], i), cancellationToken);
+            frames.Add(frame);
+            progress?.Report(new StackProgress("Loading Frames", (double)(i + 1) / filePaths.Count * 100, $"Loaded {Path.GetFileName(filePaths[i])}"));
+        }
+
+        try
+        {
+            if (alignmentMode != AlignmentMode.None && frames.Count > 1)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(new StackProgress("Alignment", 0, "Computing subpixel alignment homographies..."));
+                _alignmentEngine.AlignStack(frames, alignmentMode, false, false, 8, default, progress);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new StackProgress("Drizzle Super-Resolution", 0, $"Reconstructing {settings.ScaleFactor:F1}x Drizzle field..."));
+            var result = await Task.Run(() => _drizzleEngine.DrizzleStack(frames, settings, progress), cancellationToken);
+            progress?.Report(new StackProgress("Drizzle Super-Resolution", 100, "Drizzle Super-Resolution complete."));
+
+            return result;
+        }
+        finally
+        {
+            foreach (var frame in frames)
+            {
+                frame.Dispose();
+            }
+        }
+    }
 }
+
 
 
