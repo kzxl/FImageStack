@@ -2,11 +2,14 @@ using System.Diagnostics;
 using FImageStack.Core;
 using FImageStack.Core.Alignment;
 using FImageStack.Core.Artifact;
+using FImageStack.Core.Depth3D;
 using FImageStack.Core.DepthMap;
 using FImageStack.Core.FocusMeasure;
 using FImageStack.Core.Fusion;
+using FImageStack.Core.Hdr;
 using FImageStack.Core.Models;
 using FImageStack.Core.Motion;
+using FImageStack.Core.Noise;
 using FImageStack.Core.Quality;
 using FImageStack.Core.Reconstruction;
 using FImageStack.Core.SuperResolution;
@@ -23,6 +26,26 @@ public interface IStackService
         FusionSettings settings,
         IProgress<StackProgress>? progress = null,
         CancellationToken cancellationToken = default);
+
+    Task<NoiseStackResult> ProcessNoiseStackAsync(
+        IReadOnlyList<string> filePaths,
+        NoiseStackSettings settings,
+        AlignmentMode alignmentMode = AlignmentMode.Similarity,
+        IProgress<StackProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+
+    Task<HdrStackResult> ProcessHdrStackAsync(
+        IReadOnlyList<string> filePaths,
+        HdrStackSettings settings,
+        AlignmentMode alignmentMode = AlignmentMode.Similarity,
+        IProgress<StackProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+
+    Task ExportDepthMeshAsync(
+        ImageBuffer<float> depthMap,
+        ImageBuffer<float>? colorMap,
+        string outputPath,
+        DepthMeshOptions options);
 }
 
 public sealed class StackService : IStackService
@@ -41,6 +64,9 @@ public sealed class StackService : IStackService
     private readonly IOptimalFrameRangeSelector _optimalRangeSelector;
     private readonly IStackSimulationEngine _simulationEngine;
     private readonly IFocusGapDetector _focusGapDetector;
+    private readonly INoiseStackEngine _noiseStackEngine;
+    private readonly IHdrStackEngine _hdrStackEngine;
+    private readonly IDepthMeshExporter _depthMeshExporter;
 
     public StackService(
         IImageIO imageIO,
@@ -56,7 +82,10 @@ public sealed class StackService : IStackService
         IMultiFrameSuperResolutionEngine? superResolutionEngine = null,
         IOptimalFrameRangeSelector? optimalRangeSelector = null,
         IStackSimulationEngine? simulationEngine = null,
-        IFocusGapDetector? focusGapDetector = null)
+        IFocusGapDetector? focusGapDetector = null,
+        INoiseStackEngine? noiseStackEngine = null,
+        IHdrStackEngine? hdrStackEngine = null,
+        IDepthMeshExporter? depthMeshExporter = null)
     {
         _imageIO = imageIO;
         _alignmentEngine = alignmentEngine ?? new AdvancedAlignmentEngine();
@@ -72,7 +101,11 @@ public sealed class StackService : IStackService
         _optimalRangeSelector = optimalRangeSelector ?? new OptimalFrameRangeSelector();
         _simulationEngine = simulationEngine ?? new StackSimulationEngine();
         _focusGapDetector = focusGapDetector ?? new FocusGapDetector();
+        _noiseStackEngine = noiseStackEngine ?? new NoiseStackEngine();
+        _hdrStackEngine = hdrStackEngine ?? new HdrStackEngine();
+        _depthMeshExporter = depthMeshExporter ?? new DepthMeshExporter();
     }
+
 
     public async Task<ProcessedStackResult> ProcessStackAsync(
         IReadOnlyList<string> filePaths,
@@ -353,4 +386,127 @@ public sealed class StackService : IStackService
             }
         }
     }
+
+    public async Task<NoiseStackResult> ProcessNoiseStackAsync(
+        IReadOnlyList<string> filePaths,
+        NoiseStackSettings settings,
+        AlignmentMode alignmentMode = AlignmentMode.Similarity,
+        IProgress<StackProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (filePaths == null || filePaths.Count == 0)
+            throw new ArgumentException("At least 1 file path is required.", nameof(filePaths));
+
+        progress?.Report(new StackProgress("Loading Frames", 0, $"Loading {filePaths.Count} frames for noise reduction..."));
+        var frames = new List<StackFrame>(filePaths.Count);
+
+        for (int i = 0; i < filePaths.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var frame = await Task.Run(() => _imageIO.LoadFrame(filePaths[i], i), cancellationToken);
+            frames.Add(frame);
+            progress?.Report(new StackProgress("Loading Frames", (double)(i + 1) / filePaths.Count * 100, $"Loaded {Path.GetFileName(filePaths[i])}"));
+        }
+
+        try
+        {
+            if (alignmentMode != AlignmentMode.None && frames.Count > 1)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(new StackProgress("Alignment", 0, "Aligning frames..."));
+                _alignmentEngine.AlignStack(frames, alignmentMode, false, false, 8, default, progress);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new StackProgress("Noise Stacking", 0, $"Applying {settings.Method} noise reduction..."));
+            var result = await Task.Run(() => _noiseStackEngine.Process(frames, settings), cancellationToken);
+            progress?.Report(new StackProgress("Noise Stacking", 100, $"Noise reduction complete (+{result.EstimatedSnrImprovementDb:F1} dB SNR)."));
+
+            return result;
+        }
+        finally
+        {
+            foreach (var frame in frames)
+            {
+                frame.Dispose();
+            }
+        }
+    }
+
+    public async Task<HdrStackResult> ProcessHdrStackAsync(
+        IReadOnlyList<string> filePaths,
+        HdrStackSettings settings,
+        AlignmentMode alignmentMode = AlignmentMode.Similarity,
+        IProgress<StackProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (filePaths == null || filePaths.Count < 2)
+            throw new ArgumentException("At least 2 bracketed exposure frames are required for HDR.", nameof(filePaths));
+
+        progress?.Report(new StackProgress("Loading Frames", 0, $"Loading {filePaths.Count} exposure frames..."));
+        var frames = new List<StackFrame>(filePaths.Count);
+
+        for (int i = 0; i < filePaths.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var frame = await Task.Run(() => _imageIO.LoadFrame(filePaths[i], i), cancellationToken);
+            frames.Add(frame);
+            progress?.Report(new StackProgress("Loading Frames", (double)(i + 1) / filePaths.Count * 100, $"Loaded {Path.GetFileName(filePaths[i])}"));
+        }
+
+        try
+        {
+            if (alignmentMode != AlignmentMode.None)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                progress?.Report(new StackProgress("Alignment", 0, "Aligning bracketed exposures..."));
+                _alignmentEngine.AlignStack(frames, alignmentMode, false, false, 8, default, progress);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            progress?.Report(new StackProgress("HDR Merging", 0, $"Merging {settings.Method} HDR radiance..."));
+            var result = await Task.Run(() => _hdrStackEngine.Process(frames, settings), cancellationToken);
+            progress?.Report(new StackProgress("HDR Merging", 100, $"HDR complete ({result.EstimatedDynamicRangeEv:F1} EV Dynamic Range)."));
+
+            return result;
+        }
+        finally
+        {
+            foreach (var frame in frames)
+            {
+                frame.Dispose();
+            }
+        }
+    }
+
+    public async Task ExportDepthMeshAsync(
+        ImageBuffer<float> depthMap,
+        ImageBuffer<float>? colorMap,
+        string outputPath,
+        DepthMeshOptions options)
+    {
+        if (depthMap == null) throw new ArgumentNullException(nameof(depthMap));
+        if (string.IsNullOrWhiteSpace(outputPath)) throw new ArgumentException("Output path cannot be empty.", nameof(outputPath));
+
+        await Task.Run(() =>
+        {
+            string ext = Path.GetExtension(outputPath).ToLowerInvariant();
+            if (ext == ".ply" || options.Format == MeshExportFormat.PlyPointCloud)
+            {
+                using var fs = File.Create(outputPath);
+                _depthMeshExporter.ExportToPly(depthMap, colorMap, fs, options);
+            }
+            else if (ext == ".obj" || options.Format == MeshExportFormat.ObjSurfaceMesh)
+            {
+                using var sw = new StreamWriter(outputPath);
+                _depthMeshExporter.ExportToObj(depthMap, colorMap, sw, options);
+            }
+            else if (options.Format == MeshExportFormat.NormalMapPng)
+            {
+                using var normalMap = _depthMeshExporter.GenerateNormalMap(depthMap, options.ZScale);
+                _imageIO.SaveImage(normalMap, outputPath);
+            }
+        });
+    }
 }
+

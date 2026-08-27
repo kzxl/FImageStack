@@ -99,3 +99,38 @@ public enum GpuBackendType
     Cuda,           // NVIDIA CUDA Engine
     CpuSimd         // CPU Multi-threaded AVX2/AVX-512 SIMD Fallback
 }
+
+public enum StackType
+{
+    FocusStack,
+    HdrStack,
+    NoiseStack,
+    AstroStack,
+    SuperResolution,
+    Restoration
+}
+
+public enum NoiseStackMethod
+{
+    Mean,
+    Median,
+    KappaSigmaClipping,
+    MinMaxRejection,
+    WinsorizedMean,
+    StreamingAccumulator
+}
+
+public enum HdrMergeMethod
+{
+    MertensFusion,
+    DebevecRadiance,
+    RobertsonResponse
+}
+
+public enum MeshExportFormat
+{
+    PlyPointCloud,
+    ObjSurfaceMesh,
+    NormalMapPng
+}
+
