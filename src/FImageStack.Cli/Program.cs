@@ -1,7 +1,13 @@
 using System.Diagnostics;
 using FImageStack.Application.Services;
 using FImageStack.Core;
+using FImageStack.Core.Astro;
+using FImageStack.Core.Depth3D;
+using FImageStack.Core.Hdr;
 using FImageStack.Core.Models;
+using FImageStack.Core.Noise;
+using FImageStack.Core.Restoration;
+using FImageStack.Core.SuperResolution.Drizzle;
 using FImageStack.Infrastructure.IO;
 
 namespace FImageStack.Cli;
@@ -11,11 +17,15 @@ internal static class Program
     private static async Task<int> Main(string[] args)
     {
         Console.WriteLine("=================================================");
-        Console.WriteLine(" Intelligent Focus Fusion Engine (FImageStack CLI)");
+        Console.WriteLine(" FImageStack — Computational Imaging Engine (CLI)");
         Console.WriteLine("=================================================");
 
+        string mode = "focus"; // focus, hdr, noise, astro, drizzle, restore
         string inputDir = @"data\test_stack_50";
-        string outputPath = @"data\output_fused.png";
+        string outputPath = @"data\output_result.png";
+        string export3dPath = string.Empty;
+        
+        // Focus Stack parameters
         FusionMethod fusionMethod = FusionMethod.MultiScalePyramid;
         FocusMeasureMethod focusMethod = FocusMeasureMethod.ModifiedLaplacian;
         int pyramidLevels = 5;
@@ -26,10 +36,34 @@ internal static class Program
         bool tiled = false;
         int tileSize = 512;
 
+        // Noise Stack parameters
+        NoiseStackMethod noiseMethod = NoiseStackMethod.KappaSigmaClipping;
+        float kappa = 2.5f;
+
+        // HDR parameters
+        HdrMergeMethod hdrMethod = HdrMergeMethod.MertensFusion;
+        bool deghost = true;
+
+        // Astro parameters
+        string darkDir = string.Empty;
+        string flatDir = string.Empty;
+        string biasDir = string.Empty;
+
+        // Drizzle parameters
+        float drizzleScale = 2.0f;
+        float drizzlePixFrac = 0.70f;
+
+        // Restoration parameters
+        bool dehaze = false;
+        bool deconvolve = false;
+        float psfRadius = 2.0f;
+
         for (int i = 0; i < args.Length; i++)
         {
+            if (args[i] == "--mode" && i + 1 < args.Length) mode = args[++i].ToLowerInvariant();
             if (args[i] == "--input" && i + 1 < args.Length) inputDir = args[++i];
             if (args[i] == "--output" && i + 1 < args.Length) outputPath = args[++i];
+            if (args[i] == "--export-3d" && i + 1 < args.Length) export3dPath = args[++i];
             if (args[i] == "--method" && i + 1 < args.Length)
             {
                 string m = args[++i].ToLowerInvariant();
@@ -37,9 +71,39 @@ internal static class Program
                 {
                     "wta" or "winnertakesall" => FusionMethod.WinnerTakesAll,
                     "weighted" => FusionMethod.FocusWeighted,
+                    "hdr" or "exposure" => FusionMethod.HDRFocusExposure,
                     _ => FusionMethod.MultiScalePyramid
                 };
             }
+            if (args[i] == "--noise-method" && i + 1 < args.Length)
+            {
+                string nm = args[++i].ToLowerInvariant();
+                noiseMethod = nm switch
+                {
+                    "mean" => NoiseStackMethod.Mean,
+                    "median" => NoiseStackMethod.Median,
+                    "winsor" or "winsorized" => NoiseStackMethod.WinsorizedMean,
+                    _ => NoiseStackMethod.KappaSigmaClipping
+                };
+            }
+            if (args[i] == "--kappa" && i + 1 < args.Length) float.TryParse(args[++i], out kappa);
+            if (args[i] == "--hdr-method" && i + 1 < args.Length)
+            {
+                string hm = args[++i].ToLowerInvariant();
+                hdrMethod = hm switch
+                {
+                    "radiance" or "debevec" => HdrMergeMethod.DebevecRadiance,
+                    _ => HdrMergeMethod.MertensFusion
+                };
+            }
+            if (args[i] == "--astro-dark" && i + 1 < args.Length) darkDir = args[++i];
+            if (args[i] == "--astro-flat" && i + 1 < args.Length) flatDir = args[++i];
+            if (args[i] == "--astro-bias" && i + 1 < args.Length) biasDir = args[++i];
+            if (args[i] == "--drizzle-scale" && i + 1 < args.Length) float.TryParse(args[++i], out drizzleScale);
+            if (args[i] == "--drizzle-pixfrac" && i + 1 < args.Length) float.TryParse(args[++i], out drizzlePixFrac);
+            if (args[i] == "--dehaze") dehaze = true;
+            if (args[i] == "--deconvolve") deconvolve = true;
+            if (args[i] == "--psf-radius" && i + 1 < args.Length) float.TryParse(args[++i], out psfRadius);
             if (args[i] == "--levels" && i + 1 < args.Length) int.TryParse(args[++i], out pyramidLevels);
             if (args[i] == "--analyze-quality") qualityAnalysis = true;
             if (args[i] == "--motion-aware") motionAware = true;
@@ -61,38 +125,18 @@ internal static class Program
             return 1;
         }
 
+        Console.WriteLine($"Mode              : {mode.ToUpperInvariant()}");
         Console.WriteLine($"Scanning folder   : {Path.GetFullPath(inputDir)}");
         var imageFiles = projectService.DiscoverImageFiles(inputDir);
         Console.WriteLine($"Found             : {imageFiles.Count} frames");
 
-        var validation = projectService.ValidateStack(imageFiles);
-        if (!validation.IsValid)
+        if (imageFiles.Count == 0)
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            foreach (var issue in validation.Issues) Console.WriteLine($"Validation Error: {issue}");
+            Console.WriteLine("Error: No supported image files found in directory.");
             Console.ResetColor();
             return 1;
         }
-
-        var settings = new FusionSettings
-        {
-            Method = fusionMethod,
-            FocusMethod = focusMethod,
-            PyramidLevels = pyramidLevels,
-            EnableDepthSmoothing = true,
-            SmoothingRadius = 2,
-            EnableQualityAnalysis = qualityAnalysis,
-            EnableMotionSuppression = motionAware,
-            EnableArtifactDetection = detectArtifacts,
-            EnableAutoRepair = autoRepair,
-            EnableTiledProcessing = tiled,
-            TileSize = tileSize
-        };
-
-        Console.WriteLine($"Fusion Strategy   : {settings.Method} (Levels: {settings.PyramidLevels})");
-        Console.WriteLine($"Focus Measure     : {settings.FocusMethod}");
-        Console.WriteLine($"Diagnostics Flags : Quality={settings.EnableQualityAnalysis}, Motion={settings.EnableMotionSuppression}, Artifacts={settings.EnableArtifactDetection}, Repair={settings.EnableAutoRepair}, Tiled={settings.EnableTiledProcessing}");
-        Console.WriteLine("-------------------------------------------------");
 
         var progress = new Progress<StackProgress>(p =>
         {
@@ -101,92 +145,113 @@ internal static class Program
 
         try
         {
-            using var result = await stackService.ProcessStackAsync(imageFiles, settings, progress);
-            Console.WriteLine();
-            Console.WriteLine("-------------------------------------------------");
+            var sw = Stopwatch.StartNew();
 
-            string outDir = Path.GetDirectoryName(outputPath) ?? ".";
-
-            // Save final output image (repaired if available, otherwise fused)
-            var finalImg = result.RepairedImage ?? result.FusedImage;
-            Console.WriteLine($"Saving Fused Output to  : {Path.GetFullPath(outputPath)}");
-            imageIO.SaveImage(finalImg, outputPath, bitDepth: 8);
-
-            // Save Depth Map visualization
-            string depthOutPath = Path.Combine(outDir, "output_depth_map.png");
-            imageIO.SaveImage(result.DepthResult.DepthMap, depthOutPath, bitDepth: 8);
-            Console.WriteLine($"Saving Depth Map to     : {Path.GetFullPath(depthOutPath)}");
-
-            // Save Confidence Map visualization
-            string confOutPath = Path.Combine(outDir, "output_confidence_map.png");
-            imageIO.SaveImage(result.DepthResult.ConfidenceMap, confOutPath, bitDepth: 8);
-            Console.WriteLine($"Saving Confidence Map   : {Path.GetFullPath(confOutPath)}");
-
-            // Save Motion Map if computed
-            if (result.MotionResult != null)
+            if (mode == "noise")
             {
-                string motionOutPath = Path.Combine(outDir, "output_motion_map.png");
-                imageIO.SaveImage(result.MotionResult.MotionMap, motionOutPath, bitDepth: 8);
-                Console.WriteLine($"Saving Motion Map to    : {Path.GetFullPath(motionOutPath)}");
+                var settings = new NoiseStackSettings { Method = noiseMethod, Kappa = kappa };
+                using var noiseRes = await stackService.ProcessNoiseStackAsync(imageFiles, settings, AlignmentMode.Similarity, progress);
+                Console.WriteLine($"\nSaving Noise-Reduced Output to: {Path.GetFullPath(outputPath)}");
+                imageIO.SaveImage(noiseRes.DenoisedImage, outputPath, bitDepth: 8);
+                Console.WriteLine($"SNR Boost         : +{noiseRes.EstimatedSnrImprovementDb:F1} dB");
+            }
+            else if (mode == "hdr")
+            {
+                var settings = new HdrStackSettings { Method = hdrMethod, EnableDeghosting = deghost };
+                using var hdrRes = await stackService.ProcessHdrStackAsync(imageFiles, settings, AlignmentMode.Similarity, progress);
+                Console.WriteLine($"\nSaving HDR Tone-Mapped Output to: {Path.GetFullPath(outputPath)}");
+                imageIO.SaveImage(hdrRes.ToneMappedImage, outputPath, bitDepth: 8);
+                Console.WriteLine($"Dynamic Range     : {hdrRes.EstimatedDynamicRangeEv:F1} EV");
+            }
+            else if (mode == "astro")
+            {
+                var settings = new AstroStackSettings { Kappa = kappa };
+                AstroCalibrationPathSets? calSets = null;
+                if (!string.IsNullOrEmpty(darkDir) || !string.IsNullOrEmpty(flatDir) || !string.IsNullOrEmpty(biasDir))
+                {
+                    calSets = new AstroCalibrationPathSets
+                    {
+                        DarkPaths = Directory.Exists(darkDir) ? projectService.DiscoverImageFiles(darkDir) : null,
+                        FlatPaths = Directory.Exists(flatDir) ? projectService.DiscoverImageFiles(flatDir) : null,
+                        BiasPaths = Directory.Exists(biasDir) ? projectService.DiscoverImageFiles(biasDir) : null
+                    };
+                }
+
+                using var astroRes = await stackService.ProcessAstroStackAsync(imageFiles, settings, calSets, progress);
+                Console.WriteLine($"\nSaving Astro Output to: {Path.GetFullPath(outputPath)}");
+                imageIO.SaveImage(astroRes.StackedImage, outputPath, bitDepth: 8);
+            }
+            else if (mode == "drizzle")
+            {
+                var settings = new DrizzleSettings { ScaleFactor = drizzleScale, PixFrac = drizzlePixFrac };
+                using var drizzleRes = await stackService.ProcessDrizzleSuperResAsync(imageFiles, settings, AlignmentMode.Similarity, progress);
+                Console.WriteLine($"\nSaving Drizzle Super-Resolution Output to: {Path.GetFullPath(outputPath)}");
+                imageIO.SaveImage(drizzleRes.SuperResolvedImage, outputPath, bitDepth: 8);
+            }
+            else if (mode == "restore")
+            {
+                using var inputFrame = imageIO.LoadFrame(imageFiles[0], 0);
+                var inputImg = inputFrame.ColorBuffer ?? throw new InvalidOperationException("Could not load color buffer.");
+                ImageBuffer<float> restoredImg = inputImg;
+
+                if (dehaze)
+                {
+                    Console.WriteLine("\nApplying Dark Channel Prior Dehazing...");
+                    using var dehazeRes = await stackService.DehazeImageAsync(restoredImg, new DehazeOptions());
+                    restoredImg = dehazeRes.DehazedImage.Clone();
+                }
+                if (deconvolve)
+                {
+                    Console.WriteLine("\nApplying Richardson-Lucy Deconvolution...");
+                    var deconvRes = await stackService.DeconvolveImageAsync(restoredImg, new DeconvolutionOptions { PsfRadius = psfRadius });
+                    if (restoredImg != inputImg) restoredImg.Dispose();
+                    restoredImg = deconvRes;
+                }
+
+                Console.WriteLine($"Saving Restored Output to: {Path.GetFullPath(outputPath)}");
+                imageIO.SaveImage(restoredImg, outputPath, bitDepth: 8);
+                if (restoredImg != inputImg) restoredImg.Dispose();
             }
 
-            // Print Quality Report if enabled
-            if (result.QualityReport != null)
+            else // Default: Focus Stacking
             {
-                Console.WriteLine("=================================================");
-                Console.WriteLine(" STACK QUALITY & COVERAGE REPORT");
-                Console.WriteLine("=================================================");
-                Console.WriteLine($" Overall Quality Score  : {result.QualityReport.OverallScore:F1}% ({result.QualityReport.FocusCoverageRating})");
-                Console.WriteLine($" Focus Coverage         : {result.QualityReport.FocusCoveragePercentage:F1}%");
-                Console.WriteLine($" Detected Focus Gaps    : {result.QualityReport.DetectedGaps.Count}");
-                foreach (var gap in result.QualityReport.DetectedGaps)
+                var settings = new FusionSettings
                 {
-                    Console.WriteLine($"   * {gap.Description}");
-                }
-                foreach (var warn in result.QualityReport.Warnings)
+                    Method = fusionMethod,
+                    FocusMethod = focusMethod,
+                    PyramidLevels = pyramidLevels,
+                    EnableDepthSmoothing = true,
+                    SmoothingRadius = 2,
+                    EnableQualityAnalysis = qualityAnalysis,
+                    EnableMotionSuppression = motionAware,
+                    EnableArtifactDetection = detectArtifacts,
+                    EnableAutoRepair = autoRepair,
+                    EnableTiledProcessing = tiled,
+                    TileSize = tileSize
+                };
+
+                using var result = await stackService.ProcessStackAsync(imageFiles, settings, progress);
+                Console.WriteLine();
+                Console.WriteLine("-------------------------------------------------");
+
+                var finalImg = result.RepairedImage ?? result.FusedImage;
+                Console.WriteLine($"Saving Fused Output to  : {Path.GetFullPath(outputPath)}");
+                imageIO.SaveImage(finalImg, outputPath, bitDepth: 8);
+
+                string outDir = Path.GetDirectoryName(outputPath) ?? ".";
+                string depthOutPath = Path.Combine(outDir, "output_depth_map.png");
+                imageIO.SaveImage(result.DepthResult.DepthMap, depthOutPath, bitDepth: 8);
+
+                // 3D Point Cloud or Mesh Export
+                if (!string.IsNullOrEmpty(export3dPath))
                 {
-                    Console.ForegroundColor = ConsoleColor.Yellow;
-                    Console.WriteLine($"   [WARN] {warn}");
-                    Console.ResetColor();
+                    Console.WriteLine($"Exporting 3D Geometry to: {Path.GetFullPath(export3dPath)}");
+                    await stackService.ExportDepthMeshAsync(result.DepthResult.DepthMap, finalImg, export3dPath, new DepthMeshOptions());
                 }
             }
 
-            // Print Artifact Report if enabled
-            if (result.ArtifactMap != null)
-            {
-                Console.WriteLine("=================================================");
-                Console.WriteLine(" ARTIFACT DETECTION & RECONSTRUCTION");
-                Console.WriteLine("=================================================");
-                Console.WriteLine($" Total Regions Detected : {result.ArtifactMap.Regions.Count}");
-                Console.WriteLine($"   - Halos              : {result.ArtifactMap.HaloCount}");
-                Console.WriteLine($"   - Ghosts             : {result.ArtifactMap.GhostCount}");
-                Console.WriteLine($"   - Low Confidence     : {result.ArtifactMap.LowConfidenceCount}");
-                if (result.RepairReport != null)
-                {
-                    Console.WriteLine($" Auto-Repaired Regions  : {result.RepairReport.RepairedRegionsCount}/{result.ArtifactMap.Regions.Count}");
-                    Console.WriteLine($" Auto-Repaired Pixels   : {result.RepairReport.RepairedPixelsCount:N0} pixels");
-                }
-            }
-
-            // Print detailed Benchmark
-            var benchmark = result.Benchmark;
-            Console.WriteLine("=================================================");
-            Console.WriteLine(" PERFORMANCE BENCHMARK REPORT");
-            Console.WriteLine("=================================================");
-            Console.WriteLine($" Stack Dimensions       : {benchmark.Width} x {benchmark.Height} ({benchmark.FrameCount} frames)");
-            Console.WriteLine($" Load Time              : {benchmark.LoadTimeMs:F1} ms");
-            Console.WriteLine($" Alignment Time         : {benchmark.AlignmentTimeMs:F1} ms");
-            if (benchmark.MotionTimeMs > 0) Console.WriteLine($" Motion Detection Time  : {benchmark.MotionTimeMs:F1} ms");
-            Console.WriteLine($" Focus Measure Time     : {benchmark.FocusMeasureTimeMs:F1} ms");
-            Console.WriteLine($" Depth Map Time         : {benchmark.DepthMapTimeMs:F1} ms");
-            if (benchmark.QualityAnalysisTimeMs > 0) Console.WriteLine($" Quality Analysis Time  : {benchmark.QualityAnalysisTimeMs:F1} ms");
-            Console.WriteLine($" Fusion ({benchmark.FusionMethod,-13}) : {benchmark.FusionTimeMs:F1} ms");
-            if (benchmark.ArtifactDetectionTimeMs > 0) Console.WriteLine($" Artifact Detection Time: {benchmark.ArtifactDetectionTimeMs:F1} ms");
-            if (benchmark.AutoRepairTimeMs > 0) Console.WriteLine($" Auto-Repair Time       : {benchmark.AutoRepairTimeMs:F1} ms");
-            Console.WriteLine($" TOTAL PIPELINE TIME    : {benchmark.TotalTimeMs:F1} ms ({benchmark.TotalTimeMs / 1000.0:F2} s)");
-            Console.WriteLine($" Peak Working Set       : {benchmark.PeakWorkingSetMb} MB");
-            Console.WriteLine("=================================================");
-
+            sw.Stop();
+            Console.WriteLine($"\nPipeline execution finished in {sw.Elapsed.TotalSeconds:F2} seconds.");
             return 0;
         }
         catch (Exception ex)
