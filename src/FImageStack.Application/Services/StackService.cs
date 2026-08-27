@@ -2,6 +2,7 @@ using System.Diagnostics;
 using FImageStack.Core;
 using FImageStack.Core.Alignment;
 using FImageStack.Core.Artifact;
+using FImageStack.Core.Astro;
 using FImageStack.Core.Depth3D;
 using FImageStack.Core.DepthMap;
 using FImageStack.Core.FocusMeasure;
@@ -12,12 +13,20 @@ using FImageStack.Core.Motion;
 using FImageStack.Core.Noise;
 using FImageStack.Core.Quality;
 using FImageStack.Core.Reconstruction;
+using FImageStack.Core.Restoration;
 using FImageStack.Core.SuperResolution;
 using FImageStack.Core.Tiling;
 using FImageStack.Infrastructure.IO;
 using StackFrame = FImageStack.Core.Models.StackFrame;
 
 namespace FImageStack.Application.Services;
+
+public sealed class AstroCalibrationPathSets
+{
+    public IReadOnlyList<string>? DarkPaths { get; set; }
+    public IReadOnlyList<string>? FlatPaths { get; set; }
+    public IReadOnlyList<string>? BiasPaths { get; set; }
+}
 
 public interface IStackService
 {
@@ -40,6 +49,21 @@ public interface IStackService
         AlignmentMode alignmentMode = AlignmentMode.Similarity,
         IProgress<StackProgress>? progress = null,
         CancellationToken cancellationToken = default);
+
+    Task<AstroStackResult> ProcessAstroStackAsync(
+        IReadOnlyList<string> lightPaths,
+        AstroStackSettings settings,
+        AstroCalibrationPathSets? calibrationPaths = null,
+        IProgress<StackProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+
+    Task<ImageBuffer<float>> DeconvolveImageAsync(
+        ImageBuffer<float> input,
+        DeconvolutionOptions options);
+
+    Task<DehazeResult> DehazeImageAsync(
+        ImageBuffer<float> input,
+        DehazeOptions options);
 
     Task ExportDepthMeshAsync(
         ImageBuffer<float> depthMap,
@@ -67,6 +91,9 @@ public sealed class StackService : IStackService
     private readonly INoiseStackEngine _noiseStackEngine;
     private readonly IHdrStackEngine _hdrStackEngine;
     private readonly IDepthMeshExporter _depthMeshExporter;
+    private readonly IAstroStackEngine _astroStackEngine;
+    private readonly IRichardsonLucyEngine _richardsonLucyEngine;
+    private readonly IDehazeEngine _dehazeEngine;
 
     public StackService(
         IImageIO imageIO,
@@ -85,7 +112,10 @@ public sealed class StackService : IStackService
         IFocusGapDetector? focusGapDetector = null,
         INoiseStackEngine? noiseStackEngine = null,
         IHdrStackEngine? hdrStackEngine = null,
-        IDepthMeshExporter? depthMeshExporter = null)
+        IDepthMeshExporter? depthMeshExporter = null,
+        IAstroStackEngine? astroStackEngine = null,
+        IRichardsonLucyEngine? richardsonLucyEngine = null,
+        IDehazeEngine? dehazeEngine = null)
     {
         _imageIO = imageIO;
         _alignmentEngine = alignmentEngine ?? new AdvancedAlignmentEngine();
@@ -104,7 +134,11 @@ public sealed class StackService : IStackService
         _noiseStackEngine = noiseStackEngine ?? new NoiseStackEngine();
         _hdrStackEngine = hdrStackEngine ?? new HdrStackEngine();
         _depthMeshExporter = depthMeshExporter ?? new DepthMeshExporter();
+        _astroStackEngine = astroStackEngine ?? new AstroStackEngine();
+        _richardsonLucyEngine = richardsonLucyEngine ?? new RichardsonLucyEngine();
+        _dehazeEngine = dehazeEngine ?? new DehazeEngine();
     }
+
 
 
     public async Task<ProcessedStackResult> ProcessStackAsync(
@@ -508,5 +542,92 @@ public sealed class StackService : IStackService
             }
         });
     }
+
+    public async Task<AstroStackResult> ProcessAstroStackAsync(
+        IReadOnlyList<string> lightPaths,
+        AstroStackSettings settings,
+        AstroCalibrationPathSets? calibrationPaths = null,
+        IProgress<StackProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (lightPaths == null || lightPaths.Count == 0)
+            throw new ArgumentException("At least 1 light frame path is required.", nameof(lightPaths));
+
+        progress?.Report(new StackProgress("Loading Frames", 0, $"Loading {lightPaths.Count} astro light frames..."));
+        var lightFrames = new List<StackFrame>(lightPaths.Count);
+
+        for (int i = 0; i < lightPaths.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var frame = await Task.Run(() => _imageIO.LoadFrame(lightPaths[i], i), cancellationToken);
+            lightFrames.Add(frame);
+            progress?.Report(new StackProgress("Loading Frames", (double)(i + 1) / lightPaths.Count * 100, $"Loaded light {Path.GetFileName(lightPaths[i])}"));
+        }
+
+        AstroCalibrationFrames? calFrames = null;
+        if (calibrationPaths != null)
+        {
+            calFrames = new AstroCalibrationFrames();
+            if (calibrationPaths.DarkPaths != null)
+            {
+                for (int i = 0; i < calibrationPaths.DarkPaths.Count; i++)
+                {
+                    calFrames.DarkFrames.Add(_imageIO.LoadFrame(calibrationPaths.DarkPaths[i], i));
+                }
+            }
+            if (calibrationPaths.FlatPaths != null)
+            {
+                for (int i = 0; i < calibrationPaths.FlatPaths.Count; i++)
+                {
+                    calFrames.FlatFrames.Add(_imageIO.LoadFrame(calibrationPaths.FlatPaths[i], i));
+                }
+            }
+            if (calibrationPaths.BiasPaths != null)
+            {
+                for (int i = 0; i < calibrationPaths.BiasPaths.Count; i++)
+                {
+                    calFrames.BiasFrames.Add(_imageIO.LoadFrame(calibrationPaths.BiasPaths[i], i));
+                }
+            }
+        }
+
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await Task.Run(() => _astroStackEngine.Stack(lightFrames, calFrames, settings, progress), cancellationToken);
+            return result;
+        }
+        finally
+        {
+            calFrames?.Dispose();
+            foreach (var frame in lightFrames)
+            {
+                frame.Dispose();
+            }
+        }
+    }
+
+    public async Task<ImageBuffer<float>> DeconvolveImageAsync(
+        ImageBuffer<float> input,
+        DeconvolutionOptions options)
+    {
+        if (input == null) throw new ArgumentNullException(nameof(input));
+
+        return await Task.Run(() =>
+        {
+            using var psf = PsfGenerator.CreatePsf(options.PsfType, options.PsfRadius, options.MotionAngleDegrees);
+            return _richardsonLucyEngine.Deconvolve(input, psf, options);
+        });
+    }
+
+    public async Task<DehazeResult> DehazeImageAsync(
+        ImageBuffer<float> input,
+        DehazeOptions options)
+    {
+        if (input == null) throw new ArgumentNullException(nameof(input));
+
+        return await Task.Run(() => _dehazeEngine.Dehaze(input, options));
+    }
 }
+
 
