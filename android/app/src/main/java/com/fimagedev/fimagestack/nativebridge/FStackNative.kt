@@ -9,6 +9,20 @@ object FStackNative {
     }
 
     /**
+     * Realtime Focus Peaking execution directly over Camera2 Y-Plane (Luminance)
+     */
+    external fun renderFocusPeakingYDirect(
+        yBuffer: ByteBuffer,
+        yRowStride: Int,
+        width: Int,
+        height: Int,
+        dstBuffer: ByteBuffer,
+        peakingColor: Int,
+        displayMode: Int,
+        threshold: Float
+    ): Int
+
+    /**
      * Realtime Focus Peaking execution over direct RGBA byte buffer
      */
     external fun renderFocusPeakingRgbaDirect(

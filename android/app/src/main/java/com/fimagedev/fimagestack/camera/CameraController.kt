@@ -33,15 +33,15 @@ enum class FocusMode {
 
 data class CameraLensInfo(
     val id: String,
-    val label: String, // "0.6x", "1.0x", "2.0x", "FRONT"
+    val label: String,
     val isFront: Boolean,
     val focalLength: Float
 )
 
 data class MacroBurstConfig(
     val steps: Int = 10,
-    val startDistanceDiopters: Float = 10.0f, // 10 cm near macro
-    val endDistanceDiopters: Float = 1.0f     // 100 cm far
+    val startDistanceDiopters: Float = 9.0f,
+    val endDistanceDiopters: Float = 2.0f
 )
 
 class CameraController(private val context: Context) {
@@ -49,8 +49,11 @@ class CameraController(private val context: Context) {
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as CameraManager
     private var cameraDevice: CameraDevice? = null
     private var captureSession: CameraCaptureSession? = null
-    private var imageReader: ImageReader? = null
+    private var burstImageReader: ImageReader? = null
+    private var peakingImageReader: ImageReader? = null
     private var currentPreviewSurface: Surface? = null
+
+    var peakingAnalyzer: FocusPeakingAnalyzer? = null
 
     private var backgroundThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
@@ -67,10 +70,10 @@ class CameraController(private val context: Context) {
 
     // Focus & Pro Controls State
     var currentFocusMode: FocusMode = FocusMode.MANUAL
-    var liveManualDiopters: Float = 8.0f // Live lens focus distance
+    var liveManualDiopters: Float = 8.0f
 
     var currentFlashMode: FlashMode = FlashMode.OFF
-    var currentEvStep: Int = 0 // EV offset index
+    var currentEvStep: Int = 0
     var evRange: Range<Int> = Range(-6, 6)
     var evStepRational: Float = 0.33f
     var currentZoomRatio: Float = 1.0f
@@ -154,7 +157,20 @@ class CameraController(private val context: Context) {
             maxZoomRatio = maxZoom.coerceIn(1.0f, 10.0f)
 
             // High resolution ImageReader for burst captures
-            imageReader = ImageReader.newInstance(1920, 1080, ImageFormat.JPEG, 20)
+            burstImageReader = ImageReader.newInstance(1920, 1080, ImageFormat.JPEG, 20)
+
+            // High-framerate YUV ImageReader for Realtime Focus Peaking
+            peakingImageReader = ImageReader.newInstance(640, 480, ImageFormat.YUV_420_888, 2).apply {
+                setOnImageAvailableListener({ reader ->
+                    try {
+                        val image = reader.acquireLatestImage() ?: return@setOnImageAvailableListener
+                        peakingAnalyzer?.analyzeCamera2Image(image, sensorOrientation)
+                        image.close()
+                    } catch (e: Exception) {
+                        Log.w("CameraController", "Peaking frame error: ${e.message}")
+                    }
+                }, backgroundHandler)
+            }
 
             cameraManager.openCamera(activeCameraId, object : CameraDevice.StateCallback() {
                 override fun onOpened(camera: CameraDevice) {
@@ -184,7 +200,9 @@ class CameraController(private val context: Context) {
         onOpened: () -> Unit,
         onError: (String) -> Unit
     ) {
-        val targets = listOf(previewSurface, imageReader!!.surface)
+        val targets = mutableListOf(previewSurface, burstImageReader!!.surface)
+        peakingImageReader?.surface?.let { targets.add(it) }
+
         cameraDevice?.createCaptureSession(targets, object : CameraCaptureSession.StateCallback() {
             override fun onConfigured(session: CameraCaptureSession) {
                 captureSession = session
@@ -203,6 +221,7 @@ class CameraController(private val context: Context) {
         try {
             val requestBuilder = cameraDevice?.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)?.apply {
                 addTarget(surface)
+                peakingImageReader?.surface?.let { addTarget(it) }
                 applyProControls(this)
             }
             if (requestBuilder != null) {
@@ -310,6 +329,7 @@ class CameraController(private val context: Context) {
             // Trigger AF
             val triggerBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
                 addTarget(surface)
+                peakingImageReader?.surface?.let { addTarget(it) }
                 set(CaptureRequest.CONTROL_AF_REGIONS, arrayOf(meteringRect))
                 set(CaptureRequest.CONTROL_AE_REGIONS, arrayOf(meteringRect))
                 set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO)
@@ -343,7 +363,7 @@ class CameraController(private val context: Context) {
         val endD = config.endDistanceDiopters.coerceIn(0f, minFocusDistanceDiopters)
         val stepDelta = if (steps > 1) (startD - endD) / (steps - 1) else 0f
 
-        imageReader?.setOnImageAvailableListener({ reader ->
+        burstImageReader?.setOnImageAvailableListener({ reader ->
             val image = reader.acquireNextImage()
             if (image != null) {
                 val buffer: ByteBuffer = image.planes[0].buffer
@@ -369,7 +389,7 @@ class CameraController(private val context: Context) {
             for (i in 0 until steps) {
                 val currentDistance = startD - i * stepDelta
                 val requestBuilder = cameraDevice!!.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE).apply {
-                    addTarget(imageReader!!.surface)
+                    addTarget(burstImageReader!!.surface)
                     set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
                     set(CaptureRequest.LENS_FOCUS_DISTANCE, currentDistance)
                     set(CaptureRequest.JPEG_QUALITY, 95.toByte())
@@ -396,8 +416,10 @@ class CameraController(private val context: Context) {
         captureSession = null
         cameraDevice?.close()
         cameraDevice = null
-        imageReader?.close()
-        imageReader = null
+        burstImageReader?.close()
+        burstImageReader = null
+        peakingImageReader?.close()
+        peakingImageReader = null
         stopBackgroundThread()
     }
 }

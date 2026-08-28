@@ -103,6 +103,8 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
     private var activePreviewSurface: Surface? = null
 
     init {
+        cameraController.peakingAnalyzer = peakingAnalyzer
+
         viewModelScope.launch {
             cameraController.isCapturing.collect { capturing ->
                 _uiState.update { it.copy(isCapturing = capturing) }
