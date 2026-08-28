@@ -1,89 +1,146 @@
-# 🔬 FImageStack (FStack) — Next-Gen Computational Imaging & Computational Photography Platform
+# 🔬 FImageStack (FStack) — Next-Gen Computational Imaging & Pro Macro Photography Platform
 
 [![.NET 9.0](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![WPF Studio](https://img.shields.io/badge/GUI-WPF%20Studio%20Dark-blue?logo=windows&logoColor=white)](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/)
+[![Android 15 Client](https://img.shields.io/badge/Android-Jetpack%20Compose%20%2B%20NDK-3DDC84?logo=android&logoColor=white)](android/)
+[![WPF Studio](https://img.shields.io/badge/GUI-WPF%20Studio%20Dark-blue?logo=windows&logoColor=white)](src/FImageStack.UI/)
 [![Tests](https://img.shields.io/badge/Unit%20Tests-114%2F114%20PASS%20(100%25)-10B981)](#-kiểm-thử--chất-lượng)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20x64-0284C7?logo=windows)](https://github.com/)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20x64%20%7C%20Android%20ARM64-0284C7)](https://github.com/)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
-**FImageStack** là một **Computational Imaging Platform** (nền tảng nhiếp ảnh tính toán) tổng quát thế hệ mới viết bằng C# .NET 9.0 tối ưu hiệu năng cao (Zero-GC Unmanaged Tensors, SIMD AVX2/AVX-512, Multi-Threaded Parallelism, GPU DirectCompute). Không chỉ dừng lại ở Focus Stacking, FImageStack tích hợp 8 trụ cột thuật toán nhiếp ảnh tính toán hiện đại phục vụ từ nhiếp ảnh siêu vi mô (Macro/Microscopy), dải tương phản cao (HDR), thiên văn sâu (Astrophotography), siêu phân giải quang học (HST Drizzle Super-Resolution), phục hồi quang học (Deconvolution/Dehazing), tái tạo 3D (3D Mesh/PLY) cho đến xử lý dữ liệu thô cảm biến (Computational RAW Bayer Fusion).
+**FImageStack** là một nền tảng **Nhiếp ảnh Tính toán (Computational Imaging Platform)** thế hệ mới, hỗ trợ song song cả ứng dụng **Desktop Studio (.NET 9 WPF + C++ Native)** và ứng dụng di động thực địa **Android Pro Macro Camera (Jetpack Compose + Camera2 + NDK SIMD)**.
+
+Hệ thống tích hợp 8 phân hệ xử lý ảnh tính toán hiện đại: Focus Stacking siêu phân giải vi mô (Macro/Microscopy), Khử nhiễu thống kê đa khung hình (Statistical Noise), HDR dải tương phản cao (Mertens/Debevec), Thiên văn sâu (Astrophotography), Siêu phân giải không gian (HST Subpixel Drizzle), Phục hồi quang học (Deconvolution/Dehazing), Tái tạo mô hình 3D (PLY/OBJ) và Ghép chồng dữ liệu thô cảm biến (Computational RAW Bayer Fusion).
 
 ---
 
 ## 🏛️ Sơ Đồ Kiến Trúc Nền Tảng (Core Architecture)
 
 ```text
-FImageStack (Computational Imaging Platform)
+FImageStack Platform (Desktop Studio & Mobile Pro Camera)
 │
-├── 1. Focus Stack ────────── [Hoàn tất] Multi-Scale Pyramid, Wavelet DWT, Focus Volume 3D, Virtual Aperture DOF
-├── 2. Noise Stack ────────── [Hoàn tất] SIMD Mean, Median, Kappa-Sigma Clipping, Winsorized, Streaming O(1) RAM
-├── 3. HDR Stack ──────────── [Hoàn tất] Mertens Multi-Scale Fusion, Debevec Radiance, Motion Deghosting, ACES/AgX
-├── 4. Astro Stack ────────── [Hoàn tất] Star Centroid Detector, Asterism Triangles, Dark/Flat Calibration, Auto-Stretch
-├── 5. Super Resolution ──── [Hoàn tất] HST Subpixel Drizzle (Variable Pixel Linear Reconstruction) + Multi-frame IBP
-├── 6. Image Restoration ─── [Hoàn tất] Richardson-Lucy Deconvolution + TV Damping, Dark Channel Prior Dehazing
-├── 7. Depth Reconstruction ─ [Hoàn tất] Continuous Depth Map, Sobel Normal Maps, PLY Point Cloud, OBJ 3D Surface Meshes
-├── 8. Image Alignment ────── [Hoàn tất] Similarity, 6-DOF Affine, 8-DOF Homography, Optical Flow, Elastic Mesh, Asterisms
-└── 9. Computational RAW ──── [Hoàn tất] Bayer CFA Mosaic Fusion trước Demosaic (Google HDR+), Edge-Directed Demosaic
+├── 1. Focus Stacking ────────── Multi-Scale Laplacian Pyramid, Wavelet DWT, Focus Volume 3D, Virtual Aperture DOF
+├── 2. Noise Stacking ────────── SIMD Mean, Median, Kappa-Sigma Clipping, Winsorized, Streaming O(1) RAM
+├── 3. HDR Exposure Fusion ───── Mertens Multi-Scale Fusion, Debevec Physical Radiance, Motion Deghosting, ACES/AgX
+├── 4. Astro Deep-Sky ────────── Star Centroid Detector, Asterism Triangles, Dark/Flat Calibration, MTF Auto-Stretch
+├── 5. Super Resolution ──────── HST Subpixel Drizzle (Variable Pixel Linear Reconstruction) + Multi-frame IBP
+├── 6. Optical Restoration ───── Richardson-Lucy Deconvolution + TV Damping, Dark Channel Prior Dehazing
+├── 7. 3D Depth Reconstruction ─ Continuous Depth Maps, Sobel Surface Normals, Point Cloud (.ply), 3D Mesh (.obj)
+├── 8. Image Alignment ───────── 6-DOF Affine, 8-DOF Homography, Optical Flow, Elastic Local Mesh Warping
+├── 9. Computational RAW ─────── Bayer CFA Mosaic Fusion trước Demosaic (Google HDR+), Edge-Directed Demosaic
+└── 10. Android Pro Camera ───── Camera2 Manual Focus Dial, Hardware SIMD Peaking, Sub-Part Mosaic Stacking
 ```
 
 ---
 
-## 📑 Mục Lục
-1. [Các Phân Hệ Tính Năng Cốt Lõi](#-các-phân-hệ-tính-năng-cốt-lõi)
-2. [Giao Diện Đồ Họa (WPF Studio UI)](#-giao-diện-đồ-họa-wpf-studio-ui)
-3. [Dòng Lệnh Đa Chế Độ (CLI Batch Processing)](#-dòng-lệnh-đa-chế-độ-cli-batch-processing)
-4. [Cấu Trúc Source Code](#-cấu-trúc-source-code)
-5. [Hướng Dẫn Cài Đặt & Biên Dịch](#-hướng-dẫn-cài-đặt--biên-dịch)
-6. [Kiểm Thử & Chất Lượng](#-kiểm-thử--chất-lượng)
-7. [Dữ Liệu Mẫu Kiểm Thử & Nguồn Dẫn](#-dữ-liệu-mẫu-kiểm-thử--nguồn-dẫn)
+## 🖼️ Bộ Ảnh Mẫu Kiểm Thử Trực Quan (Visual Demo Samples)
+
+Các kết quả thực nghiệm được xử lý trực tiếp từ các tập dữ liệu chụp thực tế trong thư mục `data/`:
+
+### 1. Kiểm tra Vi mạch Điện tử & Đường dẫn SMD (PCB Electronics Inspection)
+> Lấy nét toàn phần bo mạch vi điện tử, triệt tiêu quang sai và làm nổi bật từng chân hàn IC, cuộn cảm và tụ điện micro.
+
+| Ảnh Ghép Nét Toàn Phần (Master Fused) | Bản Đồ Dò Nét Neon (Focus Peaking Stream) |
+| :---: | :---: |
+| ![PCB Master Result](data/macro_pcb_result.png) | ![PCB Peaking Stream](data/macro_pcb_peaking.png) |
+| *Ảnh Master nét căng mọi tầng linh kiện* | *Luồng vi sai 2D Laplacian bắt cạnh nét thời gian thực* |
 
 ---
 
-## 🌟 Các Phân Hệ Tính Năng Cốt Lõi
+### 2. Tiêu bản Côn trùng & Sinh học (Biological Entomology Specimen)
+> Xử lý cấu trúc râu, lông tơ và mắt kép phức tạp của bọ cánh cứng với thuật toán bù chuyển động và khử bóng ma đè lớp.
+
+| Ảnh Ghép Nét Hoàn Chỉnh (Master Fused) | Bản Đồ Độ Sâu 3D (3D Depth Map) |
+| :---: | :---: |
+| ![Beetle Master Result](data/macro_beetle_result.png) | ![Depth Map](data/macro_depth_map.png) |
+| *Khôi phục trọn vẹn râu và bề mặt bọ cánh cứng* | *Tái tạo độ sâu quang học phân lớp không gian 3D* |
+
+---
+
+### 3. Cấu trúc Sợi Vải Vi mô & Thực vật (Micro-Fabric & Botanical Macro)
+> Bóc tách từng sợi chỉ dệt vi mô và chi tiết nhị hoa không bị nhòe mờ.
+
+| Sợi Dệt Vi Mô (Micro-Fabric Textile) | Nhị Hoa Thực Vật (Botanical Bloom Macro) |
+| :---: | :---: |
+| ![Fabric Result](data/macro_fabric_result.png) | ![Flower Result](data/macro_flower_result.png) |
+| *Cấu trúc sợi dệt tương phản siêu chi tiết* | *Độ chuyển nét tự nhiên từ tiền cảnh đến hậu cảnh* |
+
+---
+
+### 4. Ghép Nối Đa Mảnh Ma Trận (Sub-Part Mosaic Matrix Fusion)
+> Chụp từng phân vùng mẫu vật lớn ở độ phóng đại cực cao và tự động ghép nối thành ảnh siêu phân giải không vết nối.
+
+| Ghép Nối Ma Trận Đa Vùng (Multi-Region Mosaic Master) | So Sánh Khử Che Khuất (Occlusion Boundary Repair) |
+| :---: | :---: |
+| ![Mosaic Result](data/demo_multi_region_result.png) | ![Occlusion Compare](data/compare_occlusion.png) |
+| *Ghép ma trận phân vùng liền mạch không vệt đen* | *Khử triệt để viền mờ halo khi các lớp chồng lên nhau* |
+
+---
+
+## 📱 Ứng Dụng Di Động Android (FImageStack Pro Mobile Client)
+
+Nằm tại thư mục `android/`, ứng dụng Android mang sức mạnh xử lý Focus Stacking trực tiếp ra thực địa:
+
+* **Công nghệ cốt lõi**: Kotlin + Jetpack Compose (Material 3 Dark Theme) + Camera2 API cấp thấp + NDK C++ SIMD (`-O3 -static-openmp`).
+* **Lấy nét thủ công thời gian thực (Manual Focus & Diopter Dial)**:
+  * Khóa hoàn toàn autofocus gây sai nét (`CONTROL_AF_MODE_OFF`).
+  * Điều khiển trực tiếp motor thấu kính vật lý qua thanh trượt Diopter ($0.5\text{D} \rightarrow 10.0\text{D}$ tương đương $\infty \rightarrow 10\text{cm}$).
+  * **Hiệu chuẩn 1 chạm (1-Tap Calibration)**: Nút `[SET NEAR]` và `[SET FAR]` để thiết lập chặn trên/chặn dưới cho chuỗi chụp Focus Bracketing tự động.
+* **Focus Peaking phần cứng siêu tốc (Zero-Copy C++ SIMD)**:
+  * Trích xuất trực tiếp kênh độ sáng **Y (Luminance)** từ luồng $60\text{fps}$ `ImageReader(YUV_420_888)`.
+  * Vi sai 2D Laplacian với 5 bảng màu Neon (Xanh lá, Đỏ, Vàng, Cyan, Hồng) hoặc chế độ nền đen trắng (Monochrome).
+* **Ghép nối Đa mảnh Ma trận (Sub-Part Mosaic Stacking)**:
+  * Chế độ **`[🔲 MOSAIC]`** hỗ trợ chụp từng góc mẫu vật lớn ($2 \times 2$ Grid hoặc $1 \times 2$ Panorama).
+  * Bản đồ thu nhỏ `SubPartMosaicHud` theo dõi tiến độ từng mảnh và tự động chuyển ô tiếp theo.
+  * Bấm **`⚡ STITCH`** để tự động căn chỉnh và hòa trộn biên mượt mà (Seam Feathering).
+* **Khung ngắm chuẩn tỉ lệ 1:1 không méo hình (True Sensor Aspect Ratio)**:
+  * Tự động căn chỉnh theo cảm biến phần cứng ($4:3$, $16:9$, $1:1$), loại bỏ hoàn toàn hiện tượng kéo dãn hình ảnh.
+  * Chế độ so sánh A/B (Split Comparison View) với thanh trượt tương tác hiển thị đúng tỷ lệ quang học.
+* **Tự động lưu thư viện & Chia sẻ (Gallery Auto-Save & Native Share)**:
+  * Tự động lưu ảnh Master JPEG $98\%$ vào album `Bộ nhớ máy > Pictures > FImageStack` qua chuẩn `MediaStore API`.
+  * Nút Share tích hợp `FileProvider` gửi ảnh trực tiếp qua Zalo, Telegram, Google Drive, Gmail.
+
+---
+
+## 📑 Các Phân Hệ Thuật Toán Cốt Lõi
 
 ### 1. 🔍 Focus Stacking & 3D Depth Reconstruction
 * **5 Thuật toán Fusion**: `Multi-Scale Laplacian Pyramid`, `HDR Focus & Exposure (Mertens Hybrid)`, `2D Wavelet DWT Fusion`, `Focus-Weighted Continuous Blend`, `Winner-Takes-All (WTA Fast)`.
 * **4 Phương pháp đo nét**: `Modified Laplacian (SML)`, `Tenengrad (Sobel Gradient)`, `Local Variance (Texture)`, `2D Wavelet Sharpness`.
-* **Khử lỗi quang học & Tự động phục hồi**: Motion-Aware Ghost Suppression, Occlusion Boundary Feathering, Edge Discontinuity Reconstruction, Artifact Hunter Scan.
-* **Tái tạo 3D & Khẩu độ ảo**: Khẩu độ ảo `f/1.4 → f/64` từ Focus Volume 3D, xuất file 3D Point Cloud (`.ply`) và Surface Mesh (`.obj`) với pháp vector Sobel Normals.
+* **Khử lỗi quang học**: Motion-Aware Ghost Suppression, Occlusion Boundary Feathering, Edge Discontinuity Reconstruction, Artifact Hunter Scan.
+* **Tái tạo 3D**: Khẩu độ ảo `f/1.4 → f/64` từ Focus Volume 3D, xuất file Point Cloud (`.ply`) và Surface Mesh (`.obj`) với pháp vector Sobel Normals.
 
 ### 2. ✨ Statistical Noise Stacking
-* **Khử nhiễu đa khung hình**: Tăng tỉ số tín hiệu trên nhiễu (SNR) lên tới **+15dB** mà không làm mất chi tiết vi mô như các bộ lọc làm mờ không gian (spatial blur).
-* **Đa thuật toán thống kê**:
-  - `Kappa-Sigma Clipping (κ-σ)`: Lọc bỏ nhiễu xung cực hạn, cosmic ray, hot pixels với $\kappa \in [1.0\sigma, 5.0\sigma]$.
-  - `SIMD Arithmetic Mean`: Trung bình cộng siêu tốc tối ưu AVX2/AVX-512 cho nhiễu Gaussian.
-  - `Median Filter`: Lọc trung vị triệt tiêu nhiễu muối tiêu (salt-and-pepper).
-  - `Winsorized Mean`: Trung bình giới hạn phân vị bền vững.
-  - `Streaming Accumulator (Welford O(1) RAM)`: Tính trung bình & phương sai trực tiếp trên luồng không tốn bộ nhớ đệm RAM.
+* Tăng tỉ số tín hiệu trên nhiễu (SNR) lên tới **+15dB** qua đa thuật toán thống kê:
+  - `Kappa-Sigma Clipping (κ-σ)`: Lọc bỏ tia vũ trụ, nhiễu xung, hot pixels.
+  - `SIMD Arithmetic Mean`: Trung bình cộng tối ưu AVX2/AVX-512.
+  - `Median Filter`: Triệt tiêu nhiễu muối tiêu.
+  - `Streaming Accumulator (Welford O(1) RAM)`: Tính trung bình & phương sai không tốn RAM.
 
 ### 3. 🌈 Pure HDR Radiance & Tone Mapping
-* **Mertens Multi-Scale Exposure Fusion**: Ghép đa mức phơi sáng giữ chi tiết vùng tối (shadows) và vùng sáng (highlights) tự nhiên không cần tính đường cong phản hồi cảm biến.
-* **Debevec Physical Radiance Map**: Tái tạo bản đồ độ rọi vật lý tuyến tính thực thụ $E(x, y)$ và thời gian phơi sáng $t_k$.
-* **Adaptive Motion Deghosting**: Nhận diện chuyển động giữa các bracket và khóa về frame chuẩn để triệt tiêu bóng ma chuyển động.
-* **Tone Mapping Studio**: Đường cong điện ảnh `ACES Filmic`, `AgX High-Dynamic Range`, `Reinhard Extended`, và `Linear RAW Preserve`.
+* **Mertens Multi-Scale Exposure Fusion**: Ghép phơi sáng tự nhiên không cần đường cong phản hồi cảm biến.
+* **Debevec Physical Radiance Map**: Tái tạo bản đồ độ rọi vật lý tuyến tính $E(x, y)$ và thời gian $t_k$.
+* **Tone Mapping Studio**: Đường cong điện ảnh `ACES Filmic`, `AgX High-Dynamic Range`, `Reinhard Extended`.
 
 ### 4. 🌌 Astro Deep-Sky Stacking & Alignment
-* **Star Centroid Detector**: Ước lượng nền trời nhiễu qua Median/MAD, dò đỉnh lân cận 8 hướng, khớp Gaussian 2D subpixel, FWHM và hệ số tròn (Roundness $\ge 0.6$).
-* **Asterism Triangle Matching**: Thuật toán tam giác sao bất biến với tỉ lệ cạnh $(L_1/L_3, L_2/L_3)$ ghép cặp sao tự động bất chấp góc xoay, dịch chuyển và bước nhảy góc ngắm kính thiên văn.
-* **Khử nhiễu hiệu chuẩn quang học (Master Calibration)**: Tự động trừ Master Dark, chia Master Flat, trừ Master Bias trước khi xếp chồng.
-* **Background Neutralization & MTF Auto-Stretch**: Tự động cân bằng nền trời và kéo giãn histogram phi tuyến tính làm nổi bật tinh vân (nebula) và dải ngân hà.
+* **Star Centroid Detector**: Khớp Gaussian 2D subpixel, FWHM và hệ số tròn (Roundness $\ge 0.6$).
+* **Asterism Triangle Matching**: Thuật toán tam giác sao bất biến với góc xoay và dịch chuyển ngắm kính thiên văn.
+* **Hiệu chuẩn quang học**: Tự động trừ Master Dark, chia Master Flat, trừ Master Bias, cân bằng nền trời và MTF Auto-Stretch.
 
 ### 5. 🔭 HST Subpixel Drizzle Super-Resolution
-* **Thuật toán Drizzle (Fruchter & Hook 2002)**: Tái tạo tuyến tính biến thiên diện tích pixel (Variable Pixel Linear Reconstruction — chuẩn kính viễn vọng không gian Hubble/HST).
-* **Phóng to độ phân giải $2\times, 3\times, 4\times$**: Chiếu các "giọt" pixel co nhỏ (`pixfrac` $p \in [0.1, 1.0]$) lên lưới ma trận subpixel mục tiêu, tích phân diện tích giao nhau chính xác để khôi phục tần số quang học vượt giới hạn Nyquist mà không gây viền ringing hay tạo ảo ảnh.
+* **Thuật toán Drizzle (Fruchter & Hook 2002)**: Tái tạo tuyến tính biến thiên diện tích pixel (chuẩn kính Hubble/HST).
+* Phóng to độ phân giải $2\times, 3\times, 4\times$ vượt giới hạn Nyquist mà không gây viền răng cưa.
 
 ### 6. ⚡ Optical Image Restoration (Deconvolution & Dehazing)
-* **Richardson-Lucy Deconvolution**: Giải chập quang học lặp với hàm phân bố điểm PSF (`Gaussian`, `Defocus Disc`, `Airy Disk`, `Motion Blur`) và trọng số giảm chấn vi phân toàn phần Total Variation (TV) chống nhiễu hạt.
-* **Dark Channel Prior Dehazing (He et al.)**: Ước lượng ánh sáng khí quyển toàn cục $\vec{A}$, tính bản đồ truyền dẫn $t(x)$ và làm mượt biên bằng bộ lọc hướng dẫn (Guided Filter) để khử sương mù, mờ hơi nước trong ảnh phong cảnh và macro.
+* **Richardson-Lucy Deconvolution**: Giải chập lặp với PSF (`Gaussian`, `Defocus Disc`, `Airy Disk`, `Motion Blur`) + Total Variation (TV) damping.
+* **Dark Channel Prior Dehazing**: Ước lượng ánh sáng khí quyển toàn cục và làm mượt biên bằng Guided Filter.
 
 ### 7. 📸 Computational RAW (Bayer Burst Fusion)
-* **Xử lý RAW cảm biến nguyên bản**: Quản lý mảng lọc màu CFA (`RGGB`, `BGGR`, `GRBG`, `GBRG`), Black Level, White Level, White Balance gains và ma trận hiệu chỉnh màu $3 \times 3$ Color Matrix (CCM).
-* **Merge-before-Demosaic (Google HDR+ Pipeline)**: Ghép chồng đa khung hình trực tiếp trên lưới lọc Bayer trước khi Demosaicing $\to$ triệt tiêu hoàn toàn sự lan truyền nhiễu nội suy qua các điểm ảnh lân cận.
-* **Edge-Directed Adaptive Demosaicing**: Nội suy kênh Green theo hướng gradient vi phân bậc 2, nội suy Red/Blue qua trường chênh lệch màu trơn tru ($R - G, B - G$) $\to$ triệt tiêu răng cưa (zippering) và sai lệch màu sắc (false color).
+* **Merge-before-Demosaic (Google HDR+ Pipeline)**: Ghép chồng đa khung hình trực tiếp trên lưới lọc Bayer trước khi Demosaicing.
+* **Edge-Directed Adaptive Demosaicing**: Nội suy Green theo gradient bậc 2, nội suy Red/Blue qua trường chênh lệch màu trơn tru.
 
 ---
 
-## 🎨 Giao Diện Đồ Họa (WPF Studio UI)
+## 🎨 Giao Diện Desktop (WPF Studio UI)
 
 Giao diện Studio Dark Theme tương phản cao (.NET 9 WPF) với thanh điều hướng 5 Tab chuyên nghiệp:
 
@@ -102,17 +159,9 @@ Giao diện Studio Dark Theme tương phản cao (.NET 9 WPF) với thanh điề
  └──────────────┴───────────────────────────────────────────────────────────────┴──────────────┘
 ```
 
-- **Tab `⚙️ Stack`**: Chọn Preset cấu hình, thuật toán Focus Fusion, đo nét, canh chỉnh, AI Diagnostics.
-- **Tab `🔬 Modes`**: Chuyển đổi linh hoạt giữa Focus Stacking, Statistical Noise, Pure HDR, Astro Stacking, HST Drizzle Super-Res, công cụ Dehaze, Deconvolve và xuất 3D Model (`.obj`/`.ply`).
-- **Tab `🎨 Tone`**: Live Histogram, Tone Mapping ACES Filmic/AgX, Exposure, Contrast, Clarity, USM Sharpening, Saturation.
-- **Tab `🖌️ Retouch`**: Cọ vẽ đè nét trực tiếp lên Canvas từ frame gốc kèm hệ thống Multi-Layer Undo/Redo.
-- **Tab `📊 Metrics`**: Bảng 6 chỉ số chất lượng, danh sách Artifact Hotspots với nút `🎯 JUMP`.
-
 ---
 
 ## 💻 Dòng Lệnh Đa Chế Độ (CLI Batch Processing)
-
-FImageStack CLI hỗ trợ xử lý tự động hàng loạt qua tham số `--mode`:
 
 ```bash
 # 1. Focus Stacking cơ bản
@@ -121,10 +170,10 @@ FImageStack.Cli.exe --mode focus --input "data/macro_stack" --output "out/fused.
 # 2. Xuất mô hình 3D Surface Mesh (.obj) từ Focus Stack
 FImageStack.Cli.exe --mode focus --input "data/macro_stack" --output "out/fused.tif" --export-3d "out/mesh.obj"
 
-# 3. Statistical Noise Stacking (Khử nhiễu đa khung hình với Kappa-Sigma)
+# 3. Statistical Noise Stacking (Khử nhiễu với Kappa-Sigma)
 FImageStack.Cli.exe --mode noise --input "data/burst_shots" --output "out/clean.png" --noise-method kappasigma --kappa 2.5
 
-# 4. Pure HDR Merge & Tone Mapping
+# 4. Pure HDR Merge & Tone Mapping ACES
 FImageStack.Cli.exe --mode hdr --input "data/bracket_hdr" --output "out/hdr_aces.tif" --hdr-method mertens
 
 # 5. Astrophotography Stacking (Sao, Dark/Flat Calibration & Auto-Stretch)
@@ -139,51 +188,9 @@ FImageStack.Cli.exe --mode restore --input "data/landscape" --output "out/restor
 
 ---
 
-## 🏛️ Cấu Trúc Source Code
-
-```text
-FImageStack/
-├── src/
-│   ├── FImageStack.Core/             # Thuật toán Computational Photography & Optical Math
-│   │   ├── Algorithms/               # Laplacian Pyramid, Wavelet DWT, Continuous Blend, WTA
-│   │   ├── Alignment/                # Global Affine/Homography + Local Elastic Mesh
-│   │   ├── Astro/                    # Star Detector, Triangle Asterism Alignment, Calibration
-│   │   ├── Depth3D/                  # Sobel Normal Maps, PLY Point Clouds, OBJ 3D Meshes
-│   │   ├── FocusMeasure/             # SML Laplacian, Tenengrad, Variance, Wavelet Sharpness
-│   │   ├── Fusion/                   # Multi-Scale Pyramid & Wavelet Fusion Engines
-│   │   ├── Hdr/                      # Mertens Fusion, Debevec Radiance, Motion Deghosting
-│   │   ├── Lab/                      # A/B Stack Lab Multi-Algorithm Parallel Benchmarking
-│   │   ├── Models/                   # ImageBuffer<T>, StackFrame, ProcessedStackResult
-│   │   ├── Noise/                    # SIMD Mean, Median, Kappa-Sigma, Winsorized, Welford O(1)
-│   │   ├── PostProcessing/           # ACES Filmic, AgX, Reinhard, Clarity, Color Matrix
-│   │   ├── Presets/                  # Preset Profiles for Macro, Astro, HDR, Drizzle, High-Power
-│   │   ├── Quality/                  # Artifact Hunter, Focus Wave 2D, Quality Predictor
-│   │   ├── Raw/                      # Raw Bayer CFA Buffer, Burst Fusion, Edge-Directed Demosaic
-│   │   ├── Reconstruction/           # Focus Breathing Compensation, Edge Reconstruction
-│   │   ├── Refocus/                  # Focus Volume 3D, Virtual Focus, Synthetic Aperture Bokeh
-│   │   ├── Restoration/              # Richardson-Lucy Deconvolution, PSF Generator, Dehazing
-│   │   ├── Retouch/                  # Canvas Brush Painting & Multi-layer Undo/Redo
-│   │   ├── SuperResolution/          # HST Subpixel Drizzle Super-Resolution Engine
-│   │   └── Tiling/                   # Memory-Bounded Gigapixel Tiled Engine (100MP+)
-│   ├── FImageStack.Application/      # StackService Orchestrator, ProjectService, Contracts
-│   ├── FImageStack.Infrastructure/   # Image IO (RAW LibRaw/Tiff/Png), Fast Bitmaps, Exif
-│   ├── FImageStack.UI/               # WPF Studio Dark Theme UI (.NET 9 MVVM)
-│   └── FImageStack.Cli/              # Headless Multi-Mode CLI Automation Tool
-├── tests/
-│   └── FImageStack.Core.Tests/       # 114 Unit & Integration Tests (xUnit)
-└── tools/
-    └── FImageStack.DatasetGenerator/ # Bộ sinh dataset giả lập chuỗi macro 50 frames
-```
-
----
-
 ## 📦 Hướng Dẫn Cài Đặt & Biên Dịch
 
-### Yêu Cầu Môi Trường
-- **Hệ điều hành**: Windows 10 / 11 (64-bit)
-- **SDK phát triển**: [.NET 9.0 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
-
-### 1. Build Dự Án & Chạy Unit Tests
+### 1. Build Desktop Solution (.NET 9 C#)
 ```bash
 # Clone repository
 git clone https://github.com/kzxl/FImageStack.git
@@ -196,37 +203,55 @@ dotnet build
 dotnet test
 ```
 
-### 2. Publish Bản Chạy (Hỗ Trợ Đủ 2 Tùy Chọn)
-
-#### Option 1: Full (Self-Contained — Copy & Chạy ngay, không cần cài .NET Runtime)
+### 2. Publish Desktop App (Full & Lite)
 ```bash
-# Publish WPF UI Studio
+# Option 1: Full Self-Contained (Copy & Chạy ngay, không cần cài .NET)
 dotnet publish src/FImageStack.UI/FImageStack.UI.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish/FImageStack-UI-Full
 
-# Publish CLI Batch Tool
-dotnet publish src/FImageStack.Cli/FImageStack.Cli.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -o ./publish/FImageStack-Cli-Full
+# Option 2: Lite Framework-Dependent (Siêu nhẹ)
+dotnet publish src/FImageStack.UI/FImageStack.UI.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ./publish/FImageStack-UI-Lite
 ```
 
-#### Option 2: Lite (Framework-Dependent — Siêu nhẹ, yêu cầu máy cài sẵn .NET 9 Runtime)
-```bash
-# Publish WPF UI Studio
-dotnet publish src/FImageStack.UI/FImageStack.UI.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ./publish/FImageStack-UI-Lite
+### 3. Build & Cài Đặt Android App (.APK)
+```powershell
+# 1-Click Build Android APK (Root Batch script)
+.\build_android.bat
 
-# Publish CLI Batch Tool
-dotnet publish src/FImageStack.Cli/FImageStack.Cli.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ./publish/FImageStack-Cli-Lite
+# Hoặc dùng Gradle Wrapper trực tiếp:
+cd android
+.\gradlew.bat assembleDebug
+
+# Cài đặt file APK trực tiếp vào điện thoại qua ADB:
+adb install -r "android/app/build/outputs/apk/debug/app-debug.apk"
 ```
 
 ---
 
-## 🧪 Kiểm Thử & Chất Lượng
+## 📸 Danh Mục Dữ Liệu Mẫu Kiểm Thử (Real Datasets)
 
-Hệ thống được bảo vệ bởi **114 Unit & Integration Tests** bao phủ toàn bộ các module:
+Dự án tích hợp sẵn các bộ dữ liệu chụp thực tế trong thư mục `data/real_samples/`:
+
+| Thư mục | Số Lượng Frame | Đối Tượng Chụp | Nguồn Trích Dẫn & Bản Quyền | Mục Tiêu Kiểm Thử |
+| :--- | :---: | :--- | :--- | :--- |
+| **`01_macro_beetle`** | **12 ảnh** | Bọ cánh cứng (Macro Beetle) | [Interactive Digital Photomontage (SIGGRAPH)](https://grail.cs.washington.edu/projects/photomontage/) | Cấu trúc râu côn trùng, ranh giới phức tạp, khử bóng ma & viền tách lớp |
+| **`02_macro_pcb_electronics`** | **10 ảnh** | Bo mạch điện tử SMD / IC | [focus-stack Benchmark Dataset](https://github.com/PetteriAimonen/focus-stack) | Kiểm tra chân hàn vi mô, canh chỉnh phối cảnh Homography |
+| **`03_macro_specimen_36frames`** | **36 ảnh** | Tiêu bản lát cắt sinh học sâu | Focus Stacking Test Sequences / Helicon Focus | Biểu đồ sóng 2D Focus Wave & Synthetic Aperture DOF |
+| **`04_macro_specimen_fast5`** | **5 ảnh** | Mẫu vật macro bước thưa | Helicon Focus Sample Sequences | Test tốc độ Fast Preview (0.3s) & chẩn đoán khoảng trống tiêu cự |
+| **`05_macro_flower_botanical`** | **14 ảnh** | Nhị hoa & Cánh hoa thực vật | Botanical Macro Archive | Độ mịn của vùng out-of-focus bokeh tự nhiên |
+| **`06_macro_fabric_tie`** | **8 ảnh** | Cấu trúc dệt sợi vải vi mô | Macro Textile Research Suite | Khôi phục độ tương phản vi mô (Micro-detail boost) |
+| **`07_macro_multi_depth`** | **16 ảnh** | Mẫu vật nhiều lớp che khuất | Multi-Depth Laboratory Series | Khử lỗi che khuất (Occlusion boundary feathering) |
+| **`08_macro_nature_bloom`** | **12 ảnh** | Chồi non & Thực vật tự nhiên | Botanical Photography Series | Khử rung lắc lá cây và chuyển động môi trường |
+| **`09_optical_multizone`** | **20 ảnh** | Tiêu bản đo độ chuẩn quang học | Optical Calibration Target | Đánh giá độ phân giải subpixel và quang sai thấu kính |
+
+---
+
+## 🧪 Kiểm Thử & Đảm Bảo Chất Lượng
 
 ```text
 Passed!  - Failed: 0, Passed: 114, Skipped: 0, Total: 114, Duration: 658 ms - FImageStack.Core.Tests.dll (net9.0)
 ```
 
-| Test Suite | Test Count | Nội dung kiểm thử |
+| Test Suite | Số Lượng Test | Nội dung kiểm thử |
 | :--- | :---: | :--- |
 | **`BayerRawFusionTests`** | 3 | Chuẩn hóa Black/White level, ghép Bayer CFA trước demosaic, nội suy vi phân cạnh |
 | **`DrizzleSuperResTests`** | 2 | Tích phân diện tích giao nhau pixel drop, khôi phục lưới siêu phân giải $2\times$ |
@@ -236,19 +261,6 @@ Passed!  - Failed: 0, Passed: 114, Skipped: 0, Total: 114, Duration: 658 ms - FI
 | **`HdrStackTests`** | 3 | Mertens exposure fusion, Debevec radiance mapping, tone-mapping ACES Filmic |
 | **`Depth3DTests`** | 3 | Tính pháp vector Sobel Normals, xuất file 3D Point Cloud PLY & Surface Mesh OBJ |
 | **`Focus & Pipeline Tests`** | 90 | Pyramid, Wavelet, Elastic Mesh, Artifact Hunter, Virtual DOF, Tiling, Retouch |
-
----
-
-## 📸 Dữ Liệu Mẫu Kiểm Thử & Nguồn Dẫn
-
-Dự án tích hợp sẵn các bộ ảnh chụp thực tế tại thư mục `data/real_samples/`:
-
-| Thư mục | Số Frame | Đối Tượng | Nguồn Trích Dẫn & Bản Quyền | Mục Tiêu Kiểm Thử |
-| :--- | :---: | :--- | :--- | :--- |
-| **`01_macro_beetle`** | **12 ảnh** | Bọ cánh cứng (Macro Beetle) | [Interactive Digital Photomontage Dataset (SIGGRAPH 2004)](https://grail.cs.washington.edu/projects/photomontage/) — Aseem Agarwala et al., University of Washington | Benchmark râu côn trùng, ranh giới phức tạp, khử bóng ma & viền tách lớp |
-| **`02_macro_pcb_electronics`** | **10 ảnh** | Bo mạch điện tử SMD / IC | [focus-stack Benchmark Dataset](https://github.com/PetteriAimonen/focus-stack) — Petteri Aimonen | Đo độ sắc nét đường mạch vi mô, canh chỉnh sai lệch phối cảnh Homography |
-| **`03_macro_specimen_36frames`** | **36 ảnh** | Tiêu bản lát cắt sinh học | [Focus Stacking Test Sequences](https://github.com/bznick98/Focus_Stacking) / Helicon Focus Tutorial Samples | Đo biểu đồ sóng 2D Focus Wave & Synthetic Aperture DOF |
-| **`04_macro_specimen_fast5`** | **5 ảnh** | Mẫu vật macro bước dịch thưa | Helicon Focus Sample Sequences | Test tốc độ Fast Preview (0.3s) & chẩn đoán khoảng trống tiêu cự (Focus Gap) |
 
 ---
 
