@@ -9,3 +9,9 @@ data/
 .vs/
 .idea/
 publish/
+.gradle/
+build/
+android/app/build/
+android/.gradle/
+android/app/.cxx/
+android/local.properties
