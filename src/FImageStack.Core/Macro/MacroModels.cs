@@ -207,6 +207,22 @@ public sealed class MacroPipelineConfig
 }
 
 /// <summary>
+/// Detailed quality evaluation and inclusion recommendation for a single frame in the stack.
+/// </summary>
+public sealed class MacroFrameAssessment
+{
+    public int FrameIndex { get; set; }
+    public string FrameLabel { get; set; } = string.Empty;
+    public double PeakSharpness { get; set; }
+    public double MeanSharpness { get; set; }
+    public double RelativeSharpnessPercent { get; set; }
+    public double UniqueContributionPercent { get; set; }
+    public bool IsCulled { get; set; }
+    public string Recommendation { get; set; } = "Keep (Sharp detail)";
+    public string CullReason { get; set; } = string.Empty;
+}
+
+/// <summary>
 /// Telemetry and quality analytics for the executed macro stack.
 /// </summary>
 public sealed class MacroQualityReport
@@ -217,6 +233,7 @@ public sealed class MacroQualityReport
     public float EstimatedDofCoverage { get; set; }
     public int DetectedFocusGaps { get; set; }
     public double AverageSharpness { get; set; }
+    public List<MacroFrameAssessment> FrameAssessments { get; } = new();
     public List<string> DiagnosticNotes { get; } = new();
 }
 

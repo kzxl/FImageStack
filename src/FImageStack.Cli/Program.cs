@@ -178,12 +178,21 @@ internal static class Program
                 Console.WriteLine("Running Macro Computational Photography Engine...");
                 using var macroRes = await macroService.ProcessMacroStackAsync(imageFiles, macroConfig, 0, progress);
                 Console.WriteLine();
-                Console.WriteLine("-------------------------------------------------");
-                Console.WriteLine($"Active Frames     : {macroRes.QualityReport.ActiveFrames}/{macroRes.QualityReport.TotalFrames} (Culled: {macroRes.QualityReport.CulledFrames})");
-                Console.WriteLine($"Estimated DOF     : {macroRes.QualityReport.EstimatedDofCoverage * 100:F1}% Depth Covered");
-                Console.WriteLine($"Avg Sharpness     : {macroRes.QualityReport.AverageSharpness:F3}");
+                Console.WriteLine("--------------------------------------------------------------------------------------------------");
+                Console.WriteLine(" Frame Quality & Exclusion Assessment (Proactive Culling)");
+                Console.WriteLine("--------------------------------------------------------------------------------------------------");
+                Console.WriteLine($" {"#",-4} {"Frame File",-28} {"Rel Sharp",-12} {"Unique Area",-14} {"Recommendation / Status"}");
+                Console.WriteLine("--------------------------------------------------------------------------------------------------");
+                foreach (var fa in macroRes.QualityReport.FrameAssessments)
+                {
+                    Console.WriteLine($" {fa.FrameIndex + 1,-4} {fa.FrameLabel,-28} {fa.RelativeSharpnessPercent,8:F1}% {fa.UniqueContributionPercent,10:F1}%   {fa.Recommendation}");
+                }
+                Console.WriteLine("--------------------------------------------------------------------------------------------------");
+                Console.WriteLine($" Active Slices    : {macroRes.QualityReport.ActiveFrames}/{macroRes.QualityReport.TotalFrames} frames ({macroRes.QualityReport.CulledFrames} excluded to maximize contrast)");
+                Console.WriteLine($" Estimated DOF    : {macroRes.QualityReport.EstimatedDofCoverage * 100:F1}% Depth of Field Preserved");
+                Console.WriteLine($" Avg Sharpness    : {macroRes.QualityReport.AverageSharpness:F3}");
 
-                Console.WriteLine($"Saving Fused Output to: {Path.GetFullPath(outputPath)}");
+                Console.WriteLine($"\nSaving Fused Output to: {Path.GetFullPath(outputPath)}");
                 string outDir = Path.GetDirectoryName(outputPath) ?? ".";
                 string depthOut = Path.Combine(outDir, "macro_depth_map.png");
                 await macroService.SaveResultAsync(macroRes, outputPath, depthOut, bitDepth: 8);

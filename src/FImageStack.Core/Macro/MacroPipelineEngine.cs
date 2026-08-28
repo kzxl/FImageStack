@@ -88,9 +88,9 @@ public sealed class MacroPipelineEngine : IMacroPipelineEngine
         };
 
         // -------------------------------------------------------------
-        // Stage 1: Quality Scoring & Intelligent Frame Culling
+        // Stage 1: Quality Scoring & Unique In-Focus Contribution Assessment
         // -------------------------------------------------------------
-        progress?.Report(new StackProgress("Macro Quality Assessment", 10, "Evaluating frame sharpness and culling blurry shots..."));
+        progress?.Report(new StackProgress("Macro Quality Assessment", 10, "Evaluating frame sharpness and unique in-focus contributions..."));
         cancellationToken.ThrowIfCancellationRequested();
         var sw = Stopwatch.StartNew();
 
@@ -104,32 +104,119 @@ public sealed class MacroPipelineEngine : IMacroPipelineEngine
             }
         }
 
+        // Calculate unique in-focus region dominance for each frame
+        int totalPixels = frameSet.Width * frameSet.Height;
+        int frameCount = frameSet.TotalFrames;
+        int[] winCounts = new int[frameCount];
+        float*[] focusPointers = new float*[frameCount];
+        for (int i = 0; i < frameCount; i++)
+        {
+            focusPointers[i] = frameSet.Frames[i].FocusMap!.DataPointer;
+        }
+
+        Parallel.For(0, frameSet.Height, y =>
+        {
+            int rowOffset = y * frameSet.Width;
+            for (int x = 0; x < frameSet.Width; x++)
+            {
+                int pIdx = rowOffset + x;
+                float maxVal = 0.0005f; // noise floor
+                int bestF = -1;
+
+                for (int f = 0; f < frameCount; f++)
+                {
+                    float val = focusPointers[f][pIdx];
+                    if (val > maxVal)
+                    {
+                        maxVal = val;
+                        bestF = f;
+                    }
+                }
+
+                if (bestF >= 0)
+                {
+                    Interlocked.Increment(ref winCounts[bestF]);
+                }
+            }
+        });
+
         int culledCount = 0;
         double sumSharpness = 0;
-        foreach (var frame in frameSet.Frames)
+
+        for (int i = 0; i < frameCount; i++)
         {
+            var frame = frameSet.Frames[i];
             sumSharpness += frame.SharpnessScore;
 
-            if (config.AutoCullBlurFrames && frameSet.TotalFrames > 2)
+            double uniqueAreaPct = (double)winCounts[i] / Math.Max(1, totalPixels) * 100.0;
+            double relSharpPct = maxSharpness > 0 ? (frame.SharpnessScore / maxSharpness) * 100.0 : 0.0;
+
+            var assessment = new MacroFrameAssessment
+            {
+                FrameIndex = frame.Index,
+                FrameLabel = string.IsNullOrEmpty(frame.Label) ? $"Frame #{frame.Index + 1}" : Path.GetFileName(frame.Label),
+                MeanSharpness = frame.SharpnessScore,
+                RelativeSharpnessPercent = relSharpPct,
+                UniqueContributionPercent = uniqueAreaPct
+            };
+
+            if (config.AutoCullBlurFrames && frameCount > 2)
             {
                 double threshold = maxSharpness * config.MinSharpnessRatio;
                 if (frame.SharpnessScore < threshold)
                 {
                     frame.IsCulled = true;
-                    frame.CullReason = $"Sharpness score ({frame.SharpnessScore:F3}) below {config.MinSharpnessRatio * 100:F0}% peak ({threshold:F3})";
+                    frame.CullReason = $"Low sharpness ({relSharpPct:F1}% of peak < {config.MinSharpnessRatio * 100:F0}%)";
+                    assessment.IsCulled = true;
+                    assessment.CullReason = frame.CullReason;
+                    assessment.Recommendation = "❌ Exclude (Blurry out-of-focus deadband)";
                     culledCount++;
-                    qualityReport.DiagnosticNotes.Add($"Frame {frame.Index} culled: {frame.CullReason}");
+                    qualityReport.DiagnosticNotes.Add($"Frame {frame.Index + 1} excluded: {frame.CullReason}");
+                }
+                else if (uniqueAreaPct < 0.40 && frameCount > 4)
+                {
+                    frame.IsCulled = true;
+                    frame.CullReason = $"Redundant slice (only {uniqueAreaPct:F2}% unique sharp area)";
+                    assessment.IsCulled = true;
+                    assessment.CullReason = frame.CullReason;
+                    assessment.Recommendation = "❌ Exclude (Redundant / Overlapped)";
+                    culledCount++;
+                    qualityReport.DiagnosticNotes.Add($"Frame {frame.Index + 1} excluded: {frame.CullReason}");
+                }
+                else
+                {
+                    assessment.IsCulled = false;
+                    assessment.Recommendation = $"✅ Keep ({uniqueAreaPct:F1}% unique in-focus detail)";
                 }
             }
+            else
+            {
+                assessment.IsCulled = false;
+                assessment.Recommendation = "✅ Keep (Manual mode)";
+            }
+
+            qualityReport.FrameAssessments.Add(assessment);
         }
 
-        // Safety fallback: If all frames were culled, un-cull the sharpest frame
-        if (frameSet.ActiveFramesCount == 0)
+        // Safety fallback: Ensure at least 2 sharpest frames remain active
+        if (frameSet.ActiveFramesCount < Math.Min(2, frameCount))
         {
-            var bestFrame = frameSet.Frames.OrderByDescending(f => f.SharpnessScore).First();
-            bestFrame.IsCulled = false;
-            bestFrame.CullReason = string.Empty;
-            culledCount--;
+            var bestFrames = frameSet.Frames.OrderByDescending(f => f.SharpnessScore).Take(2);
+            foreach (var bf in bestFrames)
+            {
+                if (bf.IsCulled)
+                {
+                    bf.IsCulled = false;
+                    bf.CullReason = string.Empty;
+                    var ass = qualityReport.FrameAssessments.FirstOrDefault(a => a.FrameIndex == bf.Index);
+                    if (ass != null)
+                    {
+                        ass.IsCulled = false;
+                        ass.Recommendation = "✅ Keep (Rescued by minimum frame policy)";
+                    }
+                    culledCount--;
+                }
+            }
         }
 
         qualityReport.ActiveFrames = frameSet.ActiveFramesCount;
