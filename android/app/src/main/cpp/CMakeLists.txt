@@ -8,15 +8,11 @@ add_library(
     fstack_jni.cpp
 )
 
-find_library(
-    log-lib
-    log
-)
+find_library(log-lib log)
+find_library(jnigraphics-lib jnigraphics)
 
-find_library(
-    jnigraphics-lib
-    jnigraphics
-)
+target_compile_options(fimagestack_native PRIVATE -O3 -std=c++17 -fopenmp)
+target_link_options(fimagestack_native PRIVATE -static-openmp -fopenmp)
 
 target_link_libraries(
     fimagestack_native

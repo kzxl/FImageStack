@@ -1,11 +1,16 @@
 package com.fimagedev.fimagestack.nativebridge
 
+import android.util.Log
 import java.nio.ByteBuffer
 
 object FStackNative {
 
     init {
-        System.loadLibrary("fimagestack_native")
+        try {
+            System.loadLibrary("fimagestack_native")
+        } catch (e: Throwable) {
+            Log.e("FStackNative", "Failed to load fimagestack_native: ${e.message}")
+        }
     }
 
     /**
