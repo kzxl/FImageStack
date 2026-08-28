@@ -33,6 +33,7 @@ internal static class Program
         bool macroBreathing = true;
         FusionMethod macroFusionMethod = FusionMethod.RegionAdaptive;
         bool macroDeconvolve = false;
+        string exportPeakingPath = string.Empty;
         
         // Focus Stack parameters
         FusionMethod fusionMethod = FusionMethod.MultiScalePyramid;
@@ -73,6 +74,7 @@ internal static class Program
             if (args[i] == "--input" && i + 1 < args.Length) inputDir = args[++i];
             if (args[i] == "--output" && i + 1 < args.Length) outputPath = args[++i];
             if (args[i] == "--export-3d" && i + 1 < args.Length) export3dPath = args[++i];
+            if (args[i] == "--export-peaking" && i + 1 < args.Length) exportPeakingPath = args[++i];
             if (args[i] == "--method" && i + 1 < args.Length)
             {
                 string m = args[++i].ToLowerInvariant();
@@ -200,6 +202,14 @@ internal static class Program
                 string outDir = Path.GetDirectoryName(outputPath) ?? ".";
                 string depthOut = Path.Combine(outDir, "macro_depth_map.png");
                 await macroService.SaveResultAsync(macroRes, outputPath, depthOut, bitDepth: 8);
+
+                if (!string.IsNullOrEmpty(exportPeakingPath))
+                {
+                    var peakingEngine = new FImageStack.Core.FocusPeaking.FocusPeakingEngine();
+                    using var peakingRes = peakingEngine.RenderFocusPeaking(macroRes.FusedImage);
+                    imageIO.SaveImage(peakingRes.PeakingImage, exportPeakingPath, bitDepth: 8);
+                    Console.WriteLine($"Focus Peaking Map : {Path.GetFullPath(exportPeakingPath)} ({peakingRes.InFocusPercentage:F1}% in-focus)");
+                }
             }
             else if (mode == "noise")
             {

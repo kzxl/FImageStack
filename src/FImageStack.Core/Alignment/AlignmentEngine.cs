@@ -225,72 +225,109 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
         float* refGray = refFrame.GrayBuffer!.DataPointer;
         float* tgtGray = targetFrame.GrayBuffer!.DataPointer;
 
-        int patchSize = 32;
-        int searchRadius = 12;
-        var gridPoints = new (int x, int y)[]
+        int patchSize = 24;
+        int searchRadius = 10;
+        int gridCols = 7;
+        int gridRows = 7;
+
+        var dxList = new List<float>();
+        var dyList = new List<float>();
+
+        for (int gy = 1; gy < gridRows; gy++)
         {
-            (w / 4, h / 4),     (w / 2, h / 4),     (w * 3 / 4, h / 4),
-            (w / 4, h / 2),     (w / 2, h / 2),     (w * 3 / 4, h / 2),
-            (w / 4, h * 3 / 4), (w / 2, h * 3 / 4), (w * 3 / 4, h * 3 / 4)
-        };
-
-        var displacements = new List<(float rx, float ry, float tx, float ty, float conf)>();
-
-        foreach (var (cx, cy) in gridPoints)
-        {
-            float bestScore = float.MaxValue;
-            int bestDx = 0, bestDy = 0;
-
-            for (int dy = -searchRadius; dy <= searchRadius; dy++)
+            int cy = (int)(gy * (h / (float)gridRows));
+            for (int gx = 1; gx < gridCols; gx++)
             {
-                for (int dx = -searchRadius; dx <= searchRadius; dx++)
+                int cx = (int)(gx * (w / (float)gridCols));
+
+                // 1. Feature Contrast Filter: Skip flat untextured patches
+                float patchMin = float.MaxValue;
+                float patchMax = float.MinValue;
+
+                for (int py = -patchSize / 2; py < patchSize / 2; py += 2)
                 {
-                    float sumDiff = 0f;
-                    int validSamples = 0;
+                    int ry = cy + py;
+                    if (ry < 0 || ry >= h) continue;
+                    int rOffset = ry * w;
 
-                    for (int py = -patchSize / 2; py < patchSize / 2; py += 2)
+                    for (int px = -patchSize / 2; px < patchSize / 2; px += 2)
                     {
-                        int ry = cy + py;
-                        int ty = cy + py + dy;
-                        if (ry < 0 || ry >= h || ty < 0 || ty >= h) continue;
-
-                        for (int px = -patchSize / 2; px < patchSize / 2; px += 2)
-                        {
-                            int rx = cx + px;
-                            int tx = cx + px + dx;
-                            if (rx < 0 || rx >= w || tx < 0 || tx >= w) continue;
-
-                            float d = MathF.Abs(refGray[ry * w + rx] - tgtGray[ty * w + tx]);
-                            sumDiff += d;
-                            validSamples++;
-                        }
-                    }
-
-                    if (validSamples > 0 && sumDiff < bestScore)
-                    {
-                        bestScore = sumDiff;
-                        bestDx = dx;
-                        bestDy = dy;
+                        int rx = cx + px;
+                        if (rx < 0 || rx >= w) continue;
+                        float val = refGray[rOffset + rx];
+                        if (val < patchMin) patchMin = val;
+                        if (val > patchMax) patchMax = val;
                     }
                 }
-            }
 
-            displacements.Add((cx, cy, cx + bestDx, cy + bestDy, 1.0f / (bestScore + 1e-4f)));
+                if ((patchMax - patchMin) < 0.06f)
+                    continue; // Skip low-contrast featureless areas
+
+                // 2. Normalized SAD block matching
+                float bestScore = float.MaxValue;
+                float worstScore = float.MinValue;
+                int bestDx = 0, bestDy = 0;
+
+                for (int dy = -searchRadius; dy <= searchRadius; dy++)
+                {
+                    for (int dx = -searchRadius; dx <= searchRadius; dx++)
+                    {
+                        float sumDiff = 0f;
+                        int validSamples = 0;
+
+                        for (int py = -patchSize / 2; py < patchSize / 2; py += 2)
+                        {
+                            int ry = cy + py;
+                            int ty = cy + py + dy;
+                            if (ry < 0 || ry >= h || ty < 0 || ty >= h) continue;
+
+                            for (int px = -patchSize / 2; px < patchSize / 2; px += 2)
+                            {
+                                int rx = cx + px;
+                                int tx = cx + px + dx;
+                                if (rx < 0 || rx >= w || tx < 0 || tx >= w) continue;
+
+                                float d = MathF.Abs(refGray[ry * w + rx] - tgtGray[ty * w + tx]);
+                                sumDiff += d;
+                                validSamples++;
+                            }
+                        }
+
+                        if (validSamples > 0)
+                        {
+                            float normScore = sumDiff / validSamples;
+                            if (normScore < bestScore)
+                            {
+                                bestScore = normScore;
+                                bestDx = dx;
+                                bestDy = dy;
+                            }
+                            if (normScore > worstScore)
+                            {
+                                worstScore = normScore;
+                            }
+                        }
+                    }
+                }
+
+                // Ensure match has significant peak-to-floor margin
+                if (bestScore < worstScore * 0.75f)
+                {
+                    dxList.Add(bestDx);
+                    dyList.Add(bestDy);
+                }
+            }
         }
 
-        if (displacements.Count > 0)
+        if (dxList.Count > 0)
         {
-            float avgDx = 0, avgDy = 0;
-            foreach (var d in displacements)
-            {
-                avgDx += (d.tx - d.rx);
-                avgDy += (d.ty - d.ry);
-            }
-            avgDx /= displacements.Count;
-            avgDy /= displacements.Count;
+            dxList.Sort();
+            dyList.Sort();
+            float medianDx = dxList[dxList.Count / 2];
+            float medianDy = dyList[dyList.Count / 2];
 
-            transform.Dx = avgDx;
-            transform.Dy = avgDy;
+            transform.Dx = medianDx;
+            transform.Dy = medianDy;
 
             if (correctFocusBreathing && (mode == AlignmentMode.Similarity || mode == AlignmentMode.Affine || mode == AlignmentMode.Homography))
             {

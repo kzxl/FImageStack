@@ -9,6 +9,7 @@ using FImageStack.Core;
 using FImageStack.Core.Acceleration;
 using FImageStack.Core.Astro;
 using FImageStack.Core.Depth3D;
+using FImageStack.Core.FocusPeaking;
 using FImageStack.Core.Hdr;
 using FImageStack.Core.Lab;
 using FImageStack.Core.Models;
@@ -524,14 +525,78 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
-    public ToneMappingOperator SelectedToneMapping
-    {
-        get => _selectedToneMapping;
-        set
+        public ToneMappingOperator SelectedToneMapping
         {
-            if (SetProperty(ref _selectedToneMapping, value)) ApplyLivePostProcessing();
+            get => _selectedToneMapping;
+            set
+            {
+                if (SetProperty(ref _selectedToneMapping, value)) ApplyLivePostProcessing();
+            }
         }
-    }
+
+        // Focus Peaking Properties
+        private readonly IFocusPeakingEngine _peakingEngine = new FocusPeakingEngine();
+        private bool _isFocusPeakingEnabled;
+        private PeakingColor _selectedPeakingColor = PeakingColor.NeonGreen;
+        private PeakingDisplayMode _selectedPeakingMode = PeakingDisplayMode.MonochromeBackground;
+        private float _peakingThreshold = 0.045f;
+        private string _peakingInFocusText = "--";
+
+        public bool IsFocusPeakingEnabled
+        {
+            get => _isFocusPeakingEnabled;
+            set
+            {
+                if (SetProperty(ref _isFocusPeakingEnabled, value))
+                {
+                    UpdateDisplayBitmap();
+                }
+            }
+        }
+
+        public PeakingColor SelectedPeakingColor
+        {
+            get => _selectedPeakingColor;
+            set
+            {
+                if (SetProperty(ref _selectedPeakingColor, value))
+                {
+                    if (IsFocusPeakingEnabled) UpdateDisplayBitmap();
+                }
+            }
+        }
+
+        public PeakingDisplayMode SelectedPeakingMode
+        {
+            get => _selectedPeakingMode;
+            set
+            {
+                if (SetProperty(ref _selectedPeakingMode, value))
+                {
+                    if (IsFocusPeakingEnabled) UpdateDisplayBitmap();
+                }
+            }
+        }
+
+        public float PeakingThreshold
+        {
+            get => _peakingThreshold;
+            set
+            {
+                if (SetProperty(ref _peakingThreshold, value))
+                {
+                    if (IsFocusPeakingEnabled) UpdateDisplayBitmap();
+                }
+            }
+        }
+
+        public string PeakingInFocusText
+        {
+            get => _peakingInFocusText;
+            set => SetProperty(ref _peakingInFocusText, value);
+        }
+
+        public ICommand ToggleFocusPeakingCommand { get; private set; } = null!;
 
     // Fusion Settings Properties
     public FusionMethod SelectedMethod
@@ -962,6 +1027,7 @@ public sealed class MainViewModel : ViewModelBase
         ZoomActualSizeCommand = new RelayCommand(_ => ZoomScale = 1.0);
         ZoomFitCommand = new RelayCommand(_ => ZoomScale = 1.0);
         Zoom200Command = new RelayCommand(_ => ZoomScale = 2.0);
+        ToggleFocusPeakingCommand = new RelayCommand(_ => IsFocusPeakingEnabled = !IsFocusPeakingEnabled);
 
         HuntArtifactsCommand = new AsyncRelayCommand(ExecuteHuntArtifactsAsync, () => !IsProcessing && Frames.Count >= 2);
         CloseHunterPopupCommand = new RelayCommand(_ => IsHunterPopupOpen = false);
@@ -2010,6 +2076,43 @@ public sealed class MainViewModel : ViewModelBase
     {
         try
         {
+            if (IsFocusPeakingEnabled)
+            {
+                ImageBuffer<float>? baseImg = null;
+                bool shouldDispose = false;
+
+                if (SelectedViewTab == 7 && SelectedFrame != null && File.Exists(SelectedFrame.FilePath))
+                {
+                    var loaded = _imageIO.LoadFrame(SelectedFrame.FilePath, SelectedFrame.Index);
+                    baseImg = loaded.ColorBuffer;
+                    shouldDispose = true;
+                }
+                else
+                {
+                    baseImg = _postProcessedBuffer ?? _lastResult?.RepairedImage ?? _lastResult?.FusedImage;
+                }
+
+                if (baseImg != null)
+                {
+                    var settings = new FocusPeakingSettings
+                    {
+                        Color = SelectedPeakingColor,
+                        Mode = SelectedPeakingMode,
+                        Threshold = PeakingThreshold
+                    };
+
+                    using var peakingRes = _peakingEngine.RenderFocusPeaking(baseImg, null, settings);
+                    PeakingInFocusText = $"{peakingRes.InFocusPercentage:F1}% in-focus";
+                    DisplayBitmap = BitmapHelper.ToBitmapSource(peakingRes.PeakingImage);
+
+                    if (shouldDispose)
+                    {
+                        baseImg.Dispose();
+                    }
+                    return;
+                }
+            }
+
             if (SelectedViewTab == 1)
             {
                 // Split A/B Comparison: Fused (Left) vs Selected Source Frame (Right)

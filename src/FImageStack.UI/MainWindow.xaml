@@ -18,6 +18,10 @@
         <vm:MainViewModel />
     </Window.DataContext>
 
+    <Window.InputBindings>
+        <KeyBinding Key="P" Modifiers="Alt" Command="{Binding ToggleFocusPeakingCommand}" />
+    </Window.InputBindings>
+
     <Grid Background="{StaticResource BgDark}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" /> <!-- Top Header Bar -->
@@ -293,7 +297,17 @@
 
                             <Button Content="Fit" Style="{StaticResource ModernButton}" Command="{Binding ZoomFitCommand}" Padding="6,3" FontSize="10" FontWeight="SemiBold" ToolTip="Fit Image in Viewport" Margin="0,0,2,0" />
                             <Button Content="1:1" Style="{StaticResource ModernButton}" Command="{Binding ZoomActualSizeCommand}" Padding="6,3" FontSize="10" FontWeight="Bold" ToolTip="100% Actual Pixel Resolution" Margin="0,0,2,0" />
-                            <Button Content="2:1" Style="{StaticResource ModernButton}" Command="{Binding Zoom200Command}" Padding="6,3" FontSize="10" FontWeight="Bold" ToolTip="200% Pixel Peep Focus" />
+                            <Button Content="2:1" Style="{StaticResource ModernButton}" Command="{Binding Zoom200Command}" Padding="6,3" FontSize="10" FontWeight="Bold" ToolTip="200% Pixel Peep Focus" Margin="0,0,4,0" />
+
+                            <Rectangle Width="1" Height="16" Fill="{StaticResource BorderDefault}" Margin="2,0,4,0" />
+
+                            <!-- Focus Peaking HUD Toggle Button (Alt+P) -->
+                            <Button Content="⚡ Peaking"
+                                    Style="{StaticResource ModernButton}"
+                                    Command="{Binding ToggleFocusPeakingCommand}"
+                                    Padding="8,3" FontSize="10" FontWeight="Bold"
+                                    Foreground="#22C55E"
+                                    ToolTip="Toggle Focus Peaking Overlay (Alt+P) to highlight in-focus edges" />
                         </StackPanel>
                     </Border>
 

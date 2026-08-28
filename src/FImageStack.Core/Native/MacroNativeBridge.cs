@@ -113,6 +113,41 @@ public static unsafe class MacroNativeBridge
     }
 
     /// <summary>
+    /// Renders real-time focus peaking over raw RGBA camera buffer.
+    /// </summary>
+    [UnmanagedCallersOnly(EntryPoint = "fstack_render_focus_peaking_rgba")]
+    public static int RenderFocusPeakingRgba(
+        byte* srcRgba,
+        int width,
+        int height,
+        byte* dstRgba,
+        int peakingColor,
+        int displayMode,
+        float threshold)
+    {
+        if (srcRgba == null || dstRgba == null || width <= 0 || height <= 0)
+            return -1;
+
+        try
+        {
+            var peakingEngine = new FocusPeaking.FocusPeakingEngine();
+            var settings = new FocusPeaking.FocusPeakingSettings
+            {
+                Color = (FocusPeaking.PeakingColor)Math.Clamp(peakingColor, 0, 5),
+                Mode = (FocusPeaking.PeakingDisplayMode)Math.Clamp(displayMode, 0, 3),
+                Threshold = Math.Clamp(threshold, 0.005f, 0.50f)
+            };
+
+            peakingEngine.RenderFocusPeakingRgbaDirect(srcRgba, width, height, dstRgba, settings);
+            return 0;
+        }
+        catch (Exception)
+        {
+            return -99;
+        }
+    }
+
+    /// <summary>
     /// Returns the engine semantic version string.
     /// </summary>
     [UnmanagedCallersOnly(EntryPoint = "fstack_get_version")]
