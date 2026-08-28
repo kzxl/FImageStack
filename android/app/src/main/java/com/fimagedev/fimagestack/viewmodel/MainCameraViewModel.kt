@@ -353,6 +353,15 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
                 firstBmp = decodeAndOrientBitmap(files[0])
             }
 
+            val savedBmp = firstBmp
+            if (savedBmp != null) {
+                com.fimagedev.fimagestack.util.ImageGalleryExporter.saveImageToGallery(
+                    getApplication(),
+                    savedBmp,
+                    "FStack_Master_${System.currentTimeMillis()}"
+                )
+            }
+
             val elapsed = System.currentTimeMillis() - startTime
 
             _uiState.update {
@@ -427,6 +436,13 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
             tiles.getOrNull(2)?.bitmap?.let { canvas.drawBitmap(it, 0f, tileH.toFloat(), paint) }
             // BR
             tiles.getOrNull(3)?.bitmap?.let { canvas.drawBitmap(it, tileW.toFloat(), tileH.toFloat(), paint) }
+
+            // Auto-save stitched master to gallery
+            com.fimagedev.fimagestack.util.ImageGalleryExporter.saveImageToGallery(
+                getApplication(),
+                stitchedBitmap,
+                "FStack_Mosaic_Master_${System.currentTimeMillis()}"
+            )
 
             val elapsed = System.currentTimeMillis() - startTime
 

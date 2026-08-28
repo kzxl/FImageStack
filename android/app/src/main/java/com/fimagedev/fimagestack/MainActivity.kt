@@ -134,7 +134,7 @@ class MainActivity : ComponentActivity() {
                                     executionTimeMs = state.executionTimeMs,
                                     onBackToCamera = { viewModel.backToCamera() },
                                     onExportResult = {
-                                        Toast.makeText(this, "Master image exported to Gallery!", Toast.LENGTH_SHORT).show()
+                                        com.fimagedev.fimagestack.util.ImageGalleryExporter.shareImage(this@MainActivity, fusedBitmap)
                                     }
                                 )
                             }
