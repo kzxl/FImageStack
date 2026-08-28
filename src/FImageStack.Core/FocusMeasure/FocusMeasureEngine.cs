@@ -34,7 +34,8 @@ public sealed class ModifiedLaplacianFocusMeasure : IFocusMeasureEngine
                 float center = src[rowOffset + x];
                 float lx = MathF.Abs(2f * center - src[rowOffset + x - 1] - src[rowOffset + x + 1]);
                 float ly = MathF.Abs(2f * center - src[prevRowOffset + x] - src[nextRowOffset + x]);
-                lap[rowOffset + x] = lx + ly;
+                float val = (lx >= 0.003f ? lx : 0f) + (ly >= 0.003f ? ly : 0f);
+                lap[rowOffset + x] = val;
             }
         });
 

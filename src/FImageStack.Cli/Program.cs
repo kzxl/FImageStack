@@ -80,7 +80,11 @@ internal static class Program
                 {
                     "wta" or "winnertakesall" => FusionMethod.WinnerTakesAll,
                     "weighted" => FusionMethod.FocusWeighted,
+                    "confidence" => FusionMethod.ConfidenceWeighted,
+                    "occlusion" => FusionMethod.OcclusionAware,
+                    "wavelet" => FusionMethod.WaveletDWT,
                     "hdr" or "exposure" => FusionMethod.HDRFocusExposure,
+                    "regionadaptive" or "adaptive" => FusionMethod.RegionAdaptive,
                     _ => FusionMethod.MultiScalePyramid
                 };
             }

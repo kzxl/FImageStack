@@ -71,20 +71,25 @@ public sealed class FocusWeightedFusionEngine : IFusionEngine
             focusPointers[i] = frames[i].FocusMap!.DataPointer;
         }
 
+        int* srcMap = depthResult.SourceFrameMap.DataPointer;
         Parallel.For(0, height, y =>
         {
             int rowOffset = y * width;
             for (int x = 0; x < width; x++)
             {
                 int pixelIdx = rowOffset + x;
+                int bestFrame = srcMap != null ? Math.Clamp(srcMap[pixelIdx], 0, frameCount - 1) : 0;
                 float totalWeight = 0f;
                 float r = 0f, g = 0f, b = 0f;
 
-                // Use power/exponent of focus measure to heighten peak weight
+                // Use power/exponent of focus measure with depth-proximity gating to prevent halo rings
                 for (int f = 0; f < frameCount; f++)
                 {
                     float sharpness = focusPointers[f][pixelIdx];
-                    float weight = MathF.Pow(sharpness + 1e-5f, 4.0f);
+                    float depthDiff = MathF.Abs(f - bestFrame);
+                    float depthGate = MathF.Exp(-(depthDiff * depthDiff) / 1.5f);
+
+                    float weight = MathF.Pow(sharpness + 1e-5f, 4.0f) * depthGate;
                     totalWeight += weight;
 
                     float* srcColor = colorPointers[f] + pixelIdx * 3;
@@ -115,8 +120,9 @@ public sealed class MultiScalePyramidFusionEngine : IFusionEngine
         int height = depthResult.Height;
         int frameCount = frames.Count;
         int levels = Math.Clamp(settings.PyramidLevels, 2, 7);
+        int* srcMap = depthResult.SourceFrameMap.DataPointer;
 
-        // Precompute weights for each frame: normalized focus map with exponent
+        // Precompute weights for each frame: normalized focus map with depth-proximity gating and exponent
         var frameWeights = new ImageBuffer<float>[frameCount];
         for (int f = 0; f < frameCount; f++)
         {
@@ -129,10 +135,14 @@ public sealed class MultiScalePyramidFusionEngine : IFusionEngine
             for (int x = 0; x < width; x++)
             {
                 int idx = rowOffset + x;
+                int bestFrame = srcMap != null ? Math.Clamp(srcMap[idx], 0, frameCount - 1) : 0;
                 float sum = 0f;
+
                 for (int f = 0; f < frameCount; f++)
                 {
-                    float w = MathF.Pow(frames[f].FocusMap!.DataPointer[idx] + 1e-4f, 3.0f);
+                    float depthDiff = MathF.Abs(f - bestFrame);
+                    float depthGate = MathF.Exp(-(depthDiff * depthDiff) / 1.8f);
+                    float w = MathF.Pow(frames[f].FocusMap!.DataPointer[idx] + 1e-4f, 3.5f) * depthGate;
                     frameWeights[f].DataPointer[idx] = w;
                     sum += w;
                 }
