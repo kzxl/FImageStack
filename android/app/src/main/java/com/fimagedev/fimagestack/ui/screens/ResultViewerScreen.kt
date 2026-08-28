@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,6 +21,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.fimagedev.fimagestack.ui.components.SplitComparisonView
+import com.fimagedev.fimagestack.ui.components.ZoomableBox
 import com.fimagedev.fimagestack.ui.theme.*
 
 @Composable
@@ -41,26 +42,32 @@ fun ResultViewerScreen(
             .fillMaxSize()
             .background(BgDark)
     ) {
-        // Main Viewer Area
-        when (selectedTab) {
-            0 -> SplitComparisonView(
-                fusedBitmap = fusedBitmap,
-                singleSliceBitmap = rawFirstSliceBitmap,
-                modifier = Modifier.fillMaxSize()
-            )
-            1 -> Image(
-                bitmap = fusedBitmap.asImageBitmap(),
-                contentDescription = "Full Master Fused",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.fillMaxSize()
-            )
-            2 -> if (depthMapBitmap != null) {
-                Image(
-                    bitmap = depthMapBitmap.asImageBitmap(),
-                    contentDescription = "3D Turbo Depth Map",
+        // Main Interactive Zoomable Viewer Area
+        ZoomableBox(
+            modifier = Modifier.fillMaxSize(),
+            minScale = 1.0f,
+            maxScale = 8.0f
+        ) {
+            when (selectedTab) {
+                0 -> SplitComparisonView(
+                    fusedBitmap = fusedBitmap,
+                    singleSliceBitmap = rawFirstSliceBitmap,
+                    modifier = Modifier.fillMaxSize()
+                )
+                1 -> Image(
+                    bitmap = fusedBitmap.asImageBitmap(),
+                    contentDescription = "Full Master Fused",
                     contentScale = ContentScale.Fit,
                     modifier = Modifier.fillMaxSize()
                 )
+                2 -> if (depthMapBitmap != null) {
+                    Image(
+                        bitmap = depthMapBitmap.asImageBitmap(),
+                        contentDescription = "3D Turbo Depth Map",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
 
@@ -81,7 +88,7 @@ fun ResultViewerScreen(
                     .background(BgPanel.copy(alpha = 0.85f))
                     .border(1.dp, BorderDefault, CircleShape)
             ) {
-                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = TextPrimary)
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = TextPrimary)
             }
 
             // Quality & Metric Badge
@@ -138,12 +145,13 @@ fun ResultViewerScreen(
                             contentColor = if (isSelected) BgDark else TextSecondary
                         ),
                         shape = RoundedCornerShape(10.dp),
-                        modifier = Modifier.weight(1f).padding(horizontal = 2.dp)
+                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp),
+                        contentPadding = PaddingValues(vertical = 8.dp)
                     ) {
                         Text(
                             text = label,
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
+                            fontSize = 11.sp,
+                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                         )
                     }
                 }

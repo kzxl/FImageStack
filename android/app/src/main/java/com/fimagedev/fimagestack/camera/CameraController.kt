@@ -39,6 +39,7 @@ class CameraController(private val context: Context) {
     val capturedCount = _capturedCount.asStateFlow()
 
     private var minFocusDistanceDiopters = 10.0f
+    var sensorOrientation: Int = 90
 
     fun startBackgroundThread() {
         backgroundThread = HandlerThread("CameraBackground").also { it.start() }
@@ -71,6 +72,7 @@ class CameraController(private val context: Context) {
 
             val characteristics = cameraManager.getCameraCharacteristics(cameraId)
             minFocusDistanceDiopters = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 10.0f
+            sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
 
             // Full resolution ImageReader for high quality burst captures
             imageReader = ImageReader.newInstance(1920, 1080, ImageFormat.JPEG, 15)
@@ -182,6 +184,7 @@ class CameraController(private val context: Context) {
                     set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
                     set(CaptureRequest.LENS_FOCUS_DISTANCE, currentDistance)
                     set(CaptureRequest.JPEG_QUALITY, 95.toByte())
+                    set(CaptureRequest.JPEG_ORIENTATION, sensorOrientation)
                 }
                 burstRequests.add(requestBuilder.build())
             }

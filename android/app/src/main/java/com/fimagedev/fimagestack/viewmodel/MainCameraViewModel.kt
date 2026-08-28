@@ -181,7 +181,7 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
 
             var firstBmp: Bitmap? = null
             if (files.isNotEmpty()) {
-                firstBmp = BitmapFactory.decodeFile(files[0].absolutePath)
+                firstBmp = decodeAndOrientBitmap(files[0])
             }
 
             val elapsed = System.currentTimeMillis() - startTime
@@ -195,6 +195,37 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
                 )
             }
         }
+    }
+
+    private fun decodeAndOrientBitmap(file: File): Bitmap {
+        val rawBitmap = BitmapFactory.decodeFile(file.absolutePath) ?: return Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        try {
+            val exif = androidx.exifinterface.media.ExifInterface(file.absolutePath)
+            val orientation = exif.getAttributeInt(
+                androidx.exifinterface.media.ExifInterface.TAG_ORIENTATION,
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_NORMAL
+            )
+            val rotationDegrees = when (orientation) {
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_90 -> 90f
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
+                androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
+                else -> {
+                    // Fallback to camera sensor orientation if Exif orientation was not set
+                    cameraController.sensorOrientation.toFloat()
+                }
+            }
+            if (rotationDegrees != 0f && rotationDegrees != 360f) {
+                val matrix = android.graphics.Matrix().apply { postRotate(rotationDegrees) }
+                val rotated = Bitmap.createBitmap(rawBitmap, 0, 0, rawBitmap.width, rawBitmap.height, matrix, true)
+                if (rotated != rawBitmap) {
+                    rawBitmap.recycle()
+                }
+                return rotated
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("MainCameraViewModel", "Exif read failed: ${e.message}")
+        }
+        return rawBitmap
     }
 
     fun backToCamera() {
