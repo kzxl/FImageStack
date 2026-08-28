@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -20,6 +21,7 @@ import com.fimagedev.fimagestack.ui.screens.ResultViewerScreen
 import com.fimagedev.fimagestack.ui.theme.BgDark
 import com.fimagedev.fimagestack.ui.theme.FImageStackTheme
 import com.fimagedev.fimagestack.viewmodel.AppScreenState
+import com.fimagedev.fimagestack.viewmodel.CameraUiEffect
 import com.fimagedev.fimagestack.viewmodel.MainCameraViewModel
 
 class MainActivity : ComponentActivity() {
@@ -47,26 +49,32 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = BgDark
                 ) {
-                    val screenState by viewModel.screenState.collectAsState()
+                    val state by viewModel.uiState.collectAsState()
 
-                    when (screenState) {
+                    // Handle One-Time Side Effects
+                    LaunchedEffect(Unit) {
+                        viewModel.effectFlow.collect { effect ->
+                            when (effect) {
+                                is CameraUiEffect.ShowToast -> {
+                                    Toast.makeText(this@MainActivity, effect.message, Toast.LENGTH_SHORT).show()
+                                }
+                                is CameraUiEffect.TriggerHapticFeedback -> {
+                                    window.decorView.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS)
+                                }
+                            }
+                        }
+                    }
+
+                    when (state.screenState) {
                         AppScreenState.CameraCapture -> {
-                            val peakingBitmap by viewModel.peakingBitmap.collectAsState()
-                            val isPeakingEnabled by viewModel.isPeakingEnabled.collectAsState()
-                            val peakingColor by viewModel.peakingColor.collectAsState()
-                            val isMonochromeMode by viewModel.isMonochromeMode.collectAsState()
-                            val burstConfig by viewModel.burstConfig.collectAsState()
-                            val isCapturing by viewModel.cameraController.isCapturing.collectAsState()
-                            val capturedCount by viewModel.cameraController.capturedCount.collectAsState()
-
                             CameraCaptureScreen(
-                                peakingBitmap = peakingBitmap,
-                                isPeakingEnabled = isPeakingEnabled,
-                                peakingColor = peakingColor,
-                                isMonochromeMode = isMonochromeMode,
-                                burstConfig = burstConfig,
-                                isCapturing = isCapturing,
-                                capturedCount = capturedCount,
+                                peakingBitmap = state.peakingBitmap,
+                                isPeakingEnabled = state.isPeakingEnabled,
+                                peakingColor = state.peakingColor,
+                                isMonochromeMode = state.isMonochromeMode,
+                                burstConfig = state.burstConfig,
+                                isCapturing = state.isCapturing,
+                                capturedCount = state.capturedCount,
                                 onTogglePeaking = { viewModel.togglePeaking() },
                                 onColorSelected = { viewModel.setPeakingColor(it) },
                                 onToggleMono = { viewModel.toggleMonochromeMode() },
@@ -77,35 +85,26 @@ class MainActivity : ComponentActivity() {
                         }
 
                         AppScreenState.Processing -> {
-                            val currentStage by viewModel.currentStage.collectAsState()
-                            val stageDesc by viewModel.stageDescription.collectAsState()
-                            val progress by viewModel.progressPercentage.collectAsState()
-                            val activeCount by viewModel.activeFramesCount.collectAsState()
-                            val culledCount by viewModel.culledFramesCount.collectAsState()
-
                             ProcessingScreen(
-                                currentStage = currentStage,
-                                stageDescription = stageDesc,
-                                progressPercentage = progress,
-                                activeFramesCount = activeCount,
-                                culledFramesCount = culledCount
+                                currentStage = state.currentStage,
+                                stageDescription = state.stageDescription,
+                                progressPercentage = state.progressPercentage,
+                                activeFramesCount = state.activeFramesCount,
+                                culledFramesCount = state.culledFramesCount
                             )
                         }
 
                         AppScreenState.ResultViewer -> {
-                            val fusedBitmap = viewModel.fusedBitmap.collectAsState().value
-                            val rawBitmap = viewModel.rawFirstSliceBitmap.collectAsState().value
-                            val depthBitmap = viewModel.depthMapBitmap.collectAsState().value
-                            val dofPreserved by viewModel.dofPreserved.collectAsState()
-                            val execTime by viewModel.executionTimeMs.collectAsState()
+                            val fusedBitmap = state.fusedBitmap
+                            val rawBitmap = state.rawFirstSliceBitmap
 
                             if (fusedBitmap != null && rawBitmap != null) {
                                 ResultViewerScreen(
                                     fusedBitmap = fusedBitmap,
                                     rawFirstSliceBitmap = rawBitmap,
-                                    depthMapBitmap = depthBitmap,
-                                    dofPreservedPercentage = dofPreserved,
-                                    executionTimeMs = execTime,
+                                    depthMapBitmap = state.depthMapBitmap,
+                                    dofPreservedPercentage = state.dofPreserved,
+                                    executionTimeMs = state.executionTimeMs,
                                     onBackToCamera = { viewModel.backToCamera() },
                                     onExportResult = {
                                         Toast.makeText(this, "Master image exported to Gallery!", Toast.LENGTH_SHORT).show()
