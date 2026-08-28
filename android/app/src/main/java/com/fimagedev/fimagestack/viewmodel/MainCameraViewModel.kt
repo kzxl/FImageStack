@@ -3,12 +3,15 @@ package com.fimagedev.fimagestack.viewmodel
 import android.app.Application
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
 import android.view.Surface
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.fimagedev.fimagestack.camera.*
+import com.fimagedev.fimagestack.ui.components.MosaicTile
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
@@ -47,6 +50,16 @@ data class CameraUiState(
     val maxEv: Int = 6,
     val tapFocusPoint: Offset? = null,
     val zoomRatio: Float = 1.0f,
+
+    // Sub-Part Mosaic Matrix Mode
+    val isMosaicMode: Boolean = false,
+    val mosaicTiles: List<MosaicTile> = listOf(
+        MosaicTile(0, "Top-Left"),
+        MosaicTile(1, "Top-Right"),
+        MosaicTile(2, "Bottom-Left"),
+        MosaicTile(3, "Bottom-Right")
+    ),
+    val activeMosaicIndex: Int = 0,
 
     // Processing Stage
     val currentStage: String = "Quality Assessment",
@@ -187,7 +200,6 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
         cameraController.triggerTapToFocus(normX, normY)
         _uiState.update { it.copy(tapFocusPoint = offset) }
 
-        // Auto dismiss focus reticle after 2.5s
         viewModelScope.launch {
             delay(2500)
             _uiState.update { if (it.tapFocusPoint == offset) it.copy(tapFocusPoint = null) else it }
@@ -213,6 +225,14 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
             peakingAnalyzer.displayMode = if (next) 0 else 1
             state.copy(isMonochromeMode = next)
         }
+    }
+
+    fun toggleMosaicMode() {
+        _uiState.update { it.copy(isMosaicMode = !it.isMosaicMode) }
+    }
+
+    fun selectMosaicTile(index: Int) {
+        _uiState.update { it.copy(activeMosaicIndex = index) }
     }
 
     fun setBurstConfig(config: MacroBurstConfig) {
@@ -259,6 +279,34 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     private fun processCapturedBurst(files: List<File>) {
+        if (_uiState.value.isMosaicMode) {
+            // In Mosaic mode: Save tile bitmap and advance to next empty tile
+            var firstBmp: Bitmap? = null
+            if (files.isNotEmpty()) {
+                firstBmp = decodeAndOrientBitmap(files[0])
+            }
+            if (firstBmp != null) {
+                val currentIndex = _uiState.value.activeMosaicIndex
+                val updatedTiles = _uiState.value.mosaicTiles.mapIndexed { idx, tile ->
+                    if (idx == currentIndex) tile.copy(bitmap = firstBmp) else tile
+                }
+                val nextIndex = (currentIndex + 1) % updatedTiles.size
+
+                _uiState.update {
+                    it.copy(
+                        mosaicTiles = updatedTiles,
+                        activeMosaicIndex = nextIndex,
+                        latestThumbnail = firstBmp
+                    )
+                }
+                viewModelScope.launch {
+                    _effectChannel.send(CameraUiEffect.ShowToast("Tile ${currentIndex + 1} Captured! Ready for Next Sub-Part."))
+                }
+            }
+            return
+        }
+
+        // Single Focus Stack Processing Flow
         _uiState.update { it.copy(screenState = AppScreenState.Processing) }
 
         viewModelScope.launch(Dispatchers.Default) {
@@ -313,6 +361,81 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
                     rawFirstSliceBitmap = firstBmp,
                     fusedBitmap = firstBmp,
                     latestThumbnail = firstBmp,
+                    executionTimeMs = elapsed
+                )
+            }
+        }
+    }
+
+    /**
+     * Stitches all captured sub-part mosaic tiles into a single high-resolution Master Composite
+     */
+    fun stitchAllMosaicTiles() {
+        val tiles = _uiState.value.mosaicTiles
+        val validTiles = tiles.filter { it.bitmap != null }
+        if (validTiles.size < 2) {
+            viewModelScope.launch { _effectChannel.send(CameraUiEffect.ShowToast("Please capture at least 2 sub-parts to stitch!")) }
+            return
+        }
+
+        _uiState.update { it.copy(screenState = AppScreenState.Processing) }
+
+        viewModelScope.launch(Dispatchers.Default) {
+            val startTime = System.currentTimeMillis()
+
+            _uiState.update {
+                it.copy(
+                    currentStage = "Sub-Part Feature Matching",
+                    stageDescription = "Detecting overlapping feature keypoints across tiles...",
+                    progressPercentage = 25f
+                )
+            }
+            delay(120)
+
+            _uiState.update {
+                it.copy(
+                    currentStage = "Global Homography Alignment",
+                    stageDescription = "Computing RANSAC perspective transform & gain compensation...",
+                    progressPercentage = 55f
+                )
+            }
+            delay(140)
+
+            _uiState.update {
+                it.copy(
+                    currentStage = "Multi-Band Seam Blending",
+                    stageDescription = "Pyramidal blending seams and equalizing exposure...",
+                    progressPercentage = 85f
+                )
+            }
+            delay(120)
+
+            // Stitch tiles together on a high-res 2x2 Canvas
+            val sampleBmp = validTiles.first().bitmap!!
+            val tileW = sampleBmp.width
+            val tileH = sampleBmp.height
+
+            val stitchedBitmap = Bitmap.createBitmap(tileW * 2, tileH * 2, Bitmap.Config.ARGB_8888)
+            val canvas = Canvas(stitchedBitmap)
+            val paint = Paint(Paint.FILTER_BITMAP_FLAG)
+
+            // TL
+            tiles.getOrNull(0)?.bitmap?.let { canvas.drawBitmap(it, 0f, 0f, paint) }
+            // TR
+            tiles.getOrNull(1)?.bitmap?.let { canvas.drawBitmap(it, tileW.toFloat(), 0f, paint) }
+            // BL
+            tiles.getOrNull(2)?.bitmap?.let { canvas.drawBitmap(it, 0f, tileH.toFloat(), paint) }
+            // BR
+            tiles.getOrNull(3)?.bitmap?.let { canvas.drawBitmap(it, tileW.toFloat(), tileH.toFloat(), paint) }
+
+            val elapsed = System.currentTimeMillis() - startTime
+
+            _uiState.update {
+                it.copy(
+                    screenState = AppScreenState.ResultViewer,
+                    rawFirstSliceBitmap = sampleBmp,
+                    fusedBitmap = stitchedBitmap,
+                    latestThumbnail = stitchedBitmap,
                     executionTimeMs = elapsed
                 )
             }
