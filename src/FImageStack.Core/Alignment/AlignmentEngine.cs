@@ -556,8 +556,8 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
         float centerX = w / 2f;
         float centerY = h / 2f;
 
-        float invScaleX = 1f / transform.ScaleX;
-        float invScaleY = 1f / transform.ScaleY;
+        float scaleX = transform.ScaleX;
+        float scaleY = transform.ScaleY;
         float dx = transform.Dx;
         float dy = transform.Dy;
 
@@ -572,11 +572,11 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
             Parallel.For(0, h, y =>
             {
                 int rowOffset = y * w * ch;
-                float srcY = (y - centerY - dy) * invScaleY + centerY;
+                float srcY = (y - centerY) * scaleY + centerY + dy;
 
                 for (int x = 0; x < w; x++)
                 {
-                    float srcX = (x - centerX - dx) * invScaleX + centerX;
+                    float srcX = (x - centerX) * scaleX + centerX + dx;
                     int dstIdx = rowOffset + x * ch;
 
                     int x0 = (int)MathF.Floor(srcX);
@@ -619,11 +619,11 @@ public sealed class AdvancedAlignmentEngine : IAlignmentEngine
             Parallel.For(0, h, y =>
             {
                 int rowOffset = y * w;
-                float srcY = (y - centerY - dy) * invScaleY + centerY;
+                float srcY = (y - centerY) * scaleY + centerY + dy;
 
                 for (int x = 0; x < w; x++)
                 {
-                    float srcX = (x - centerX - dx) * invScaleX + centerX;
+                    float srcX = (x - centerX) * scaleX + centerX + dx;
                     int dstIdx = rowOffset + x;
 
                     int x0 = (int)MathF.Floor(srcX);
