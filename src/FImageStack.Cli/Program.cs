@@ -4,6 +4,7 @@ using FImageStack.Core;
 using FImageStack.Core.Astro;
 using FImageStack.Core.Depth3D;
 using FImageStack.Core.Hdr;
+using FImageStack.Core.Macro;
 using FImageStack.Core.Models;
 using FImageStack.Core.Noise;
 using FImageStack.Core.Restoration;
@@ -20,10 +21,18 @@ internal static class Program
         Console.WriteLine(" FImageStack — Computational Imaging Engine (CLI)");
         Console.WriteLine("=================================================");
 
-        string mode = "focus"; // focus, hdr, noise, astro, drizzle, restore
+        string mode = "focus"; // focus, macro, hdr, noise, astro, drizzle, restore
         string inputDir = @"data\test_stack_50";
         string outputPath = @"data\output_result.png";
         string export3dPath = string.Empty;
+        
+        // Macro Stacking parameters
+        bool macroAutoCull = true;
+        float macroMinSharpness = 0.12f;
+        float macroDetailBoost = 0.35f;
+        bool macroBreathing = true;
+        FusionMethod macroFusionMethod = FusionMethod.RegionAdaptive;
+        bool macroDeconvolve = false;
         
         // Focus Stack parameters
         FusionMethod fusionMethod = FusionMethod.MultiScalePyramid;
@@ -109,6 +118,11 @@ internal static class Program
             if (args[i] == "--motion-aware") motionAware = true;
             if (args[i] == "--detect-artifacts") detectArtifacts = true;
             if (args[i] == "--repair") { detectArtifacts = true; autoRepair = true; }
+            if (args[i] == "--macro-cull" && i + 1 < args.Length) bool.TryParse(args[++i], out macroAutoCull);
+            if (args[i] == "--macro-min-sharpness" && i + 1 < args.Length) float.TryParse(args[++i], out macroMinSharpness);
+            if (args[i] == "--macro-detail" && i + 1 < args.Length) float.TryParse(args[++i], out macroDetailBoost);
+            if (args[i] == "--macro-breathing" && i + 1 < args.Length) bool.TryParse(args[++i], out macroBreathing);
+            if (args[i] == "--macro-deconv") macroDeconvolve = true;
             if (args[i] == "--tiled") tiled = true;
             if (args[i] == "--tile-size" && i + 1 < args.Length) int.TryParse(args[++i], out tileSize);
         }
@@ -116,6 +130,7 @@ internal static class Program
         var imageIO = new ImageSharpIO();
         var projectService = new ProjectService();
         var stackService = new StackService(imageIO);
+        var macroService = new MacroService(imageIO);
 
         if (!Directory.Exists(inputDir))
         {
@@ -147,7 +162,33 @@ internal static class Program
         {
             var sw = Stopwatch.StartNew();
 
-            if (mode == "noise")
+            if (mode == "macro")
+            {
+                var macroConfig = new MacroPipelineConfig
+                {
+                    AutoCullBlurFrames = macroAutoCull,
+                    MinSharpnessRatio = macroMinSharpness,
+                    MicroDetailStrength = macroDetailBoost,
+                    EnableMicroDetailRecovery = macroDetailBoost > 0,
+                    EnableFocusBreathingCorrection = macroBreathing,
+                    EnableDeconvolution = macroDeconvolve,
+                    FusionMethod = macroFusionMethod
+                };
+
+                Console.WriteLine("Running Macro Computational Photography Engine...");
+                using var macroRes = await macroService.ProcessMacroStackAsync(imageFiles, macroConfig, 0, progress);
+                Console.WriteLine();
+                Console.WriteLine("-------------------------------------------------");
+                Console.WriteLine($"Active Frames     : {macroRes.QualityReport.ActiveFrames}/{macroRes.QualityReport.TotalFrames} (Culled: {macroRes.QualityReport.CulledFrames})");
+                Console.WriteLine($"Estimated DOF     : {macroRes.QualityReport.EstimatedDofCoverage * 100:F1}% Depth Covered");
+                Console.WriteLine($"Avg Sharpness     : {macroRes.QualityReport.AverageSharpness:F3}");
+
+                Console.WriteLine($"Saving Fused Output to: {Path.GetFullPath(outputPath)}");
+                string outDir = Path.GetDirectoryName(outputPath) ?? ".";
+                string depthOut = Path.Combine(outDir, "macro_depth_map.png");
+                await macroService.SaveResultAsync(macroRes, outputPath, depthOut, bitDepth: 8);
+            }
+            else if (mode == "noise")
             {
                 var settings = new NoiseStackSettings { Method = noiseMethod, Kappa = kappa };
                 using var noiseRes = await stackService.ProcessNoiseStackAsync(imageFiles, settings, AlignmentMode.Similarity, progress);
