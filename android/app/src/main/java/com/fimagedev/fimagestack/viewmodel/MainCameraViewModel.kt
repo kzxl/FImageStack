@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Paint
+import android.graphics.Rect
 import android.view.Surface
 import androidx.compose.runtime.Immutable
 import androidx.compose.ui.geometry.Offset
@@ -32,11 +33,15 @@ data class CameraUiState(
     val isPeakingEnabled: Boolean = true,
     val peakingColor: Int = 0, // Neon Green
     val isMonochromeMode: Boolean = true,
-    val burstConfig: MacroBurstConfig = MacroBurstConfig(steps = 10, startDistanceDiopters = 10.0f, endDistanceDiopters = 1.0f),
+    val burstConfig: MacroBurstConfig = MacroBurstConfig(steps = 10, startDistanceDiopters = 9.0f, endDistanceDiopters = 2.0f),
     val isCapturing: Boolean = false,
     val capturedCount: Int = 0,
 
-    // Pro Controls State
+    // Pro Focus Controls
+    val focusMode: FocusMode = FocusMode.MANUAL,
+    val liveManualDiopters: Float = 8.0f,
+
+    // Pro Toolbar Controls
     val flashMode: FlashMode = FlashMode.OFF,
     val timerSeconds: Int = 0, // 0 (Off), 2, 5
     val countdownRemaining: Int = 0,
@@ -125,6 +130,8 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
                         evStepRational = cameraController.evStepRational
                     )
                 }
+                // Initialize default manual focus lens position
+                cameraController.setLiveManualFocus(_uiState.value.liveManualDiopters)
             },
             onError = { err ->
                 viewModelScope.launch {
@@ -132,6 +139,37 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
                 }
             }
         )
+    }
+
+    // Live Focus Controls
+    fun setFocusMode(mode: FocusMode) {
+        cameraController.setFocusMode(mode)
+        _uiState.update { it.copy(focusMode = mode) }
+    }
+
+    fun setLiveManualFocus(diopters: Float) {
+        cameraController.setLiveManualFocus(diopters)
+        _uiState.update { it.copy(liveManualDiopters = diopters, focusMode = FocusMode.MANUAL) }
+    }
+
+    fun setNearCalibrationPoint() {
+        val currentD = _uiState.value.liveManualDiopters
+        _uiState.update {
+            it.copy(burstConfig = it.burstConfig.copy(startDistanceDiopters = currentD))
+        }
+        viewModelScope.launch {
+            _effectChannel.send(CameraUiEffect.ShowToast(String.format("Near Stack Bound Set: %.1fD", currentD)))
+        }
+    }
+
+    fun setFarCalibrationPoint() {
+        val currentD = _uiState.value.liveManualDiopters
+        _uiState.update {
+            it.copy(burstConfig = it.burstConfig.copy(endDistanceDiopters = currentD))
+        }
+        viewModelScope.launch {
+            _effectChannel.send(CameraUiEffect.ShowToast(String.format("Far Stack Bound Set: %.1fD", currentD)))
+        }
     }
 
     // Pro Toolbar Controls
@@ -198,7 +236,7 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
         val normY = (offset.y / viewHeight).coerceIn(0f, 1f)
 
         cameraController.triggerTapToFocus(normX, normY)
-        _uiState.update { it.copy(tapFocusPoint = offset) }
+        _uiState.update { it.copy(tapFocusPoint = offset, focusMode = FocusMode.AF_LOCKED) }
 
         viewModelScope.launch {
             delay(2500)
@@ -419,23 +457,41 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
             }
             delay(120)
 
-            // Stitch tiles together on a high-res 2x2 Canvas
+            // Dynamic Tile Layout & Stitching
             val sampleBmp = validTiles.first().bitmap!!
             val tileW = sampleBmp.width
             val tileH = sampleBmp.height
 
-            val stitchedBitmap = Bitmap.createBitmap(tileW * 2, tileH * 2, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(stitchedBitmap)
+            val tl = tiles.getOrNull(0)?.bitmap
+            val tr = tiles.getOrNull(1)?.bitmap
+            val bl = tiles.getOrNull(2)?.bitmap
+            val br = tiles.getOrNull(3)?.bitmap
+
+            val stitchedBitmap: Bitmap
+            val canvas: Canvas
             val paint = Paint(Paint.FILTER_BITMAP_FLAG)
 
-            // TL
-            tiles.getOrNull(0)?.bitmap?.let { canvas.drawBitmap(it, 0f, 0f, paint) }
-            // TR
-            tiles.getOrNull(1)?.bitmap?.let { canvas.drawBitmap(it, tileW.toFloat(), 0f, paint) }
-            // BL
-            tiles.getOrNull(2)?.bitmap?.let { canvas.drawBitmap(it, 0f, tileH.toFloat(), paint) }
-            // BR
-            tiles.getOrNull(3)?.bitmap?.let { canvas.drawBitmap(it, tileW.toFloat(), tileH.toFloat(), paint) }
+            if (bl == null && br == null && tl != null && tr != null) {
+                // 1x2 Horizontal Panorama
+                stitchedBitmap = Bitmap.createBitmap(tileW * 2, tileH, Bitmap.Config.ARGB_8888)
+                canvas = Canvas(stitchedBitmap)
+                canvas.drawBitmap(tl, 0f, 0f, paint)
+                canvas.drawBitmap(tr, tileW.toFloat(), 0f, paint)
+            } else if (tr == null && br == null && tl != null && bl != null) {
+                // 1x2 Vertical Strip
+                stitchedBitmap = Bitmap.createBitmap(tileW, tileH * 2, Bitmap.Config.ARGB_8888)
+                canvas = Canvas(stitchedBitmap)
+                canvas.drawBitmap(tl, 0f, 0f, paint)
+                canvas.drawBitmap(bl, 0f, tileH.toFloat(), paint)
+            } else {
+                // 2x2 Grid Master
+                stitchedBitmap = Bitmap.createBitmap(tileW * 2, tileH * 2, Bitmap.Config.ARGB_8888)
+                canvas = Canvas(stitchedBitmap)
+                tl?.let { canvas.drawBitmap(it, 0f, 0f, paint) }
+                tr?.let { canvas.drawBitmap(it, tileW.toFloat(), 0f, paint) }
+                bl?.let { canvas.drawBitmap(it, 0f, tileH.toFloat(), paint) }
+                br?.let { canvas.drawBitmap(it, tileW.toFloat(), tileH.toFloat(), paint) }
+            }
 
             // Auto-save stitched master to gallery
             com.fimagedev.fimagestack.util.ImageGalleryExporter.saveImageToGallery(

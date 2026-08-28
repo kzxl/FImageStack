@@ -25,6 +25,12 @@ enum class FlashMode {
     AUTO
 }
 
+enum class FocusMode {
+    MANUAL,
+    CONTINUOUS_AF,
+    AF_LOCKED
+}
+
 data class CameraLensInfo(
     val id: String,
     val label: String, // "0.6x", "1.0x", "2.0x", "FRONT"
@@ -59,7 +65,10 @@ class CameraController(private val context: Context) {
     var sensorOrientation: Int = 90
     var activeCameraId: String = "0"
 
-    // Pro Controls State
+    // Focus & Pro Controls State
+    var currentFocusMode: FocusMode = FocusMode.MANUAL
+    var liveManualDiopters: Float = 8.0f // Live lens focus distance
+
     var currentFlashMode: FlashMode = FlashMode.OFF
     var currentEvStep: Int = 0 // EV offset index
     var evRange: Range<Int> = Range(-6, 6)
@@ -194,7 +203,6 @@ class CameraController(private val context: Context) {
         try {
             val requestBuilder = cameraDevice?.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)?.apply {
                 addTarget(surface)
-                set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
                 applyProControls(this)
             }
             if (requestBuilder != null) {
@@ -206,10 +214,24 @@ class CameraController(private val context: Context) {
     }
 
     private fun applyProControls(builder: CaptureRequest.Builder) {
-        // 1. Exposure Compensation
+        // 1. Focus Mode & Manual Lens Diopter Stepping
+        when (currentFocusMode) {
+            FocusMode.MANUAL -> {
+                builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF)
+                builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, liveManualDiopters.coerceIn(0f, minFocusDistanceDiopters))
+            }
+            FocusMode.CONTINUOUS_AF -> {
+                builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+            }
+            FocusMode.AF_LOCKED -> {
+                builder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO)
+            }
+        }
+
+        // 2. Exposure Compensation
         builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, currentEvStep.coerceIn(evRange.lower, evRange.upper))
 
-        // 2. Flash / Torch Mode
+        // 3. Flash / Torch Mode
         when (currentFlashMode) {
             FlashMode.OFF -> {
                 builder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
@@ -224,31 +246,36 @@ class CameraController(private val context: Context) {
             }
         }
 
-        // 3. Digital Zoom
+        // 4. Digital Zoom
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             builder.set(CaptureRequest.CONTROL_ZOOM_RATIO, currentZoomRatio)
         }
     }
 
     /**
-     * Updates EV exposure compensation value in real time
+     * Updates manual focus distance in real time and moves physical lens
      */
+    fun setLiveManualFocus(diopters: Float) {
+        currentFocusMode = FocusMode.MANUAL
+        liveManualDiopters = diopters.coerceIn(0f, minFocusDistanceDiopters)
+        startPreview()
+    }
+
+    fun setFocusMode(mode: FocusMode) {
+        currentFocusMode = mode
+        startPreview()
+    }
+
     fun setExposureCompensation(evStep: Int) {
         currentEvStep = evStep.coerceIn(evRange.lower, evRange.upper)
         startPreview()
     }
 
-    /**
-     * Toggles between Flash OFF, TORCH (constant macro fill light), and AUTO
-     */
     fun setFlashMode(mode: FlashMode) {
         currentFlashMode = mode
         startPreview()
     }
 
-    /**
-     * Sets digital zoom magnification
-     */
     fun setZoomRatio(ratio: Float) {
         currentZoomRatio = ratio.coerceIn(1.0f, maxZoomRatio)
         startPreview()
@@ -278,6 +305,7 @@ class CameraController(private val context: Context) {
             )
 
             val meteringRect = MeteringRectangle(focusRect, MeteringRectangle.METERING_WEIGHT_MAX)
+            currentFocusMode = FocusMode.AF_LOCKED
 
             // Trigger AF
             val triggerBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {

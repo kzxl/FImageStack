@@ -12,10 +12,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Camera
-import androidx.compose.material.icons.filled.GridView
-import androidx.compose.material.icons.filled.Layers
-import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.fimagedev.fimagestack.camera.CameraLensInfo
 import com.fimagedev.fimagestack.camera.FlashMode
+import com.fimagedev.fimagestack.camera.FocusMode
 import com.fimagedev.fimagestack.camera.MacroBurstConfig
 import com.fimagedev.fimagestack.ui.components.*
 import com.fimagedev.fimagestack.ui.theme.*
@@ -47,6 +45,8 @@ fun CameraCaptureScreen(
     burstConfig: MacroBurstConfig,
     isCapturing: Boolean,
     capturedCount: Int,
+    focusMode: FocusMode,
+    liveManualDiopters: Float,
     flashMode: FlashMode,
     timerSeconds: Int,
     countdownRemaining: Int,
@@ -63,6 +63,10 @@ fun CameraCaptureScreen(
     isMosaicMode: Boolean,
     mosaicTiles: List<MosaicTile>,
     activeMosaicIndex: Int,
+    onFocusModeChanged: (FocusMode) -> Unit,
+    onLiveDioptersChanged: (Float) -> Unit,
+    onSetNearPoint: () -> Unit,
+    onSetFarPoint: () -> Unit,
     onToggleFlash: () -> Unit,
     onToggleTimer: () -> Unit,
     onToggleGrid: () -> Unit,
@@ -85,7 +89,7 @@ fun CameraCaptureScreen(
     var viewWidth by remember { mutableFloatStateOf(1080f) }
     var viewHeight by remember { mutableFloatStateOf(1920f) }
 
-    // Accurate Portrait Camera Sensor Aspect Ratios (Eliminates live view stretching!)
+    // Accurate Portrait Camera Sensor Aspect Ratio (Zero stretching!)
     val targetAspectRatio = when (aspectRatio) {
         "16:9" -> 9f / 16f
         "1:1" -> 1f
@@ -97,7 +101,7 @@ fun CameraCaptureScreen(
             .fillMaxSize()
             .background(BgDark)
     ) {
-        // 1. Camera Viewfinder Frame with TRUE 1:1 Aspect Ratio (No Stretching)
+        // 1. Camera Viewfinder Canvas with 1:1 Aspect Ratio (No Stretching)
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -129,7 +133,7 @@ fun CameraCaptureScreen(
                 modifier = Modifier.fillMaxSize()
             )
 
-            // Focus Peaking Neon Overlay Stream (Mapped 1:1 to sensor aspect)
+            // Focus Peaking Neon Overlay Stream (Mapped 1:1)
             if (isPeakingEnabled && peakingBitmap != null) {
                 Image(
                     bitmap = peakingBitmap.asImageBitmap(),
@@ -165,41 +169,56 @@ fun CameraCaptureScreen(
                 onToggleAspectRatio = onToggleAspectRatio
             )
 
-            // Sub-Toolbar: Lens Switcher + Mosaic Mode + Peaking HUD
+            // Sub-Toolbar: Mode Tabs (Stack vs Mosaic) + Peaking Palette
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    .padding(horizontal = 16.dp, vertical = 2.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    // Lens selector (0.6x, 1x, 2x)
-                    LensSelectorRow(
-                        lenses = availableLenses,
-                        selectedLensId = selectedLensId,
-                        onLensSelected = onLensSelected
-                    )
-
-                    // Sub-Part Mosaic Mode Toggle Button
-                    IconButton(
-                        onClick = onToggleMosaicMode,
+                // Mode Switcher Tabs
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(BgPanel.copy(alpha = 0.85f))
+                        .border(1.dp, BorderDefault, RoundedCornerShape(20.dp))
+                        .padding(2.dp)
+                ) {
+                    Box(
                         modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape)
-                            .background(if (isMosaicMode) PrimaryCyan else BgPanel.copy(alpha = 0.85f))
-                            .border(1.dp, BorderDefault, CircleShape)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (!isMosaicMode) PrimaryNeonGreen else Color.Transparent)
+                            .clickable { if (isMosaicMode) onToggleMosaicMode() }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.GridView,
-                            contentDescription = "Mosaic Matrix Mode",
-                            tint = if (isMosaicMode) BgDark else TextPrimary,
-                            modifier = Modifier.size(18.dp)
+                        Text(
+                            text = "⚡ STACK",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (!isMosaicMode) BgDark else TextSecondary
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(if (isMosaicMode) PrimaryCyan else Color.Transparent)
+                            .clickable { if (!isMosaicMode) onToggleMosaicMode() }
+                            .padding(horizontal = 10.dp, vertical = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "🔲 MOSAIC",
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isMosaicMode) BgDark else TextSecondary
                         )
                     }
                 }
 
-                // Neon Peaking HUD
+                // Neon Peaking HUD Controls
                 PeakingHudControls(
                     isPeakingEnabled = isPeakingEnabled,
                     selectedColor = peakingColor,
@@ -224,7 +243,7 @@ fun CameraCaptureScreen(
             )
         }
 
-        // Exposure Compensation (EV) Slider floating on Right/Top
+        // Exposure Compensation (EV) Slider floating on Right
         ExposureSlider(
             currentEv = currentEv,
             evStepRational = evStepRational,
@@ -233,7 +252,7 @@ fun CameraCaptureScreen(
             onEvChanged = onEvChanged,
             modifier = Modifier
                 .align(Alignment.TopEnd)
-                .padding(top = 115.dp, end = 16.dp)
+                .padding(top = 110.dp, end = 16.dp)
         )
 
         // 3. Countdown Overlay
@@ -253,37 +272,41 @@ fun CameraCaptureScreen(
             }
         }
 
-        // 4. Bottom Controls HUD
+        // 4. Bottom Pro Deck (Focus Calibration Dial + Shutter Row)
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .align(Alignment.BottomCenter)
                 .navigationBarsPadding()
-                .padding(16.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Focus Bracketing Diopter Stepping Slider
-            FocusRangeSlider(
+            // Pro Focus Calibration & Diopter Dial
+            FocusCalibrationDeck(
+                focusMode = focusMode,
+                liveDiopters = liveManualDiopters,
                 startDiopters = burstConfig.startDistanceDiopters,
                 endDiopters = burstConfig.endDistanceDiopters,
                 steps = burstConfig.steps,
-                onStartChanged = { onBurstConfigChanged(burstConfig.copy(startDistanceDiopters = it)) },
-                onEndChanged = { onBurstConfigChanged(burstConfig.copy(endDistanceDiopters = it)) },
+                onFocusModeChanged = onFocusModeChanged,
+                onLiveDioptersChanged = onLiveDioptersChanged,
+                onSetNearPoint = onSetNearPoint,
+                onSetFarPoint = onSetFarPoint,
                 onStepsChanged = { onBurstConfigChanged(burstConfig.copy(steps = it)) }
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Shutter Button Row
+            // Shutter Row (Gallery Thumbnail | Shutter Button | Lens Switcher)
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Left: Gallery Thumbnail of Latest Result
                 Box(
                     modifier = Modifier
-                        .size(52.dp)
+                        .size(50.dp)
                         .clip(CircleShape)
                         .background(BgPanel)
                         .border(2.dp, if (latestThumbnail != null) PrimaryNeonGreen else BorderDefault, CircleShape)
@@ -305,7 +328,7 @@ fun CameraCaptureScreen(
                 // Center: 1-Tap Pro Macro Shutter Button
                 Box(
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(76.dp)
                         .clip(CircleShape)
                         .background(if (isCapturing) AccentRed else if (isMosaicMode) PrimaryCyan else PrimaryNeonGreen)
                         .clickable(enabled = !isCapturing) { onStartBurstCapture() },
@@ -313,7 +336,7 @@ fun CameraCaptureScreen(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(68.dp)
+                            .size(64.dp)
                             .clip(CircleShape)
                             .background(BgDark),
                         contentAlignment = Alignment.Center
@@ -328,7 +351,7 @@ fun CameraCaptureScreen(
                         } else {
                             Box(
                                 modifier = Modifier
-                                    .size(54.dp)
+                                    .size(50.dp)
                                     .clip(CircleShape)
                                     .background(if (isMosaicMode) PrimaryCyan else PrimaryNeonGreen),
                                 contentAlignment = Alignment.Center
@@ -346,22 +369,12 @@ fun CameraCaptureScreen(
                     }
                 }
 
-                // Right: Quick Peaking Visibility Toggle
-                IconButton(
-                    onClick = onTogglePeaking,
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(CircleShape)
-                        .background(if (isPeakingEnabled) PrimaryNeonGreen else BgPanel)
-                        .border(1.dp, BorderDefault, CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Visibility,
-                        contentDescription = "Peaking Toggle",
-                        tint = if (isPeakingEnabled) BgDark else TextPrimary,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
+                // Right: Quick Lens Switcher (0.6x | 1x | 2x)
+                LensSelectorRow(
+                    lenses = availableLenses,
+                    selectedLensId = selectedLensId,
+                    onLensSelected = onLensSelected
+                )
             }
         }
     }

@@ -49,16 +49,37 @@ fun SplitComparisonView(
                     }
                 }
         ) {
+            val imgW = singleSliceBitmap.width.toFloat()
+            val imgH = singleSliceBitmap.height.toFloat()
+            val imgAspect = if (imgH > 0) imgW / imgH else 1f
+            val viewAspect = if (heightPx > 0) widthPx / heightPx else 1f
+
+            val dstW: Float
+            val dstH: Float
+            val dstLeft: Float
+            val dstTop: Float
+
+            if (viewAspect > imgAspect) {
+                dstH = heightPx
+                dstW = heightPx * imgAspect
+                dstLeft = (widthPx - dstW) / 2f
+                dstTop = 0f
+            } else {
+                dstW = widthPx
+                dstH = widthPx / imgAspect
+                dstLeft = 0f
+                dstTop = (heightPx - dstH) / 2f
+            }
+
+            val srcRect = Rect(0, 0, singleSliceBitmap.width, singleSliceBitmap.height)
+            val dstRect = Rect(dstLeft.toInt(), dstTop.toInt(), (dstLeft + dstW).toInt(), (dstTop + dstH).toInt())
             val splitX = widthPx * splitFraction
-            val canvas = drawIntoCanvas { it.nativeCanvas }
 
             drawIntoCanvas { nativeCanvasScope ->
                 val nCanvas = nativeCanvasScope.nativeCanvas
-                val srcRect = Rect(0, 0, singleSliceBitmap.width, singleSliceBitmap.height)
-                val dstRect = Rect(0, 0, widthPx.toInt(), heightPx.toInt())
                 val paint = Paint().apply { isFilterBitmap = true }
 
-                // 1. Draw Single Raw Slice on entire background
+                // 1. Draw Single Raw Slice on entire fitted canvas
                 nCanvas.drawBitmap(singleSliceBitmap, srcRect, dstRect, paint)
 
                 // 2. Draw Fused All-In-Focus Master clipped to left of split line
@@ -68,16 +89,16 @@ fun SplitComparisonView(
                 nCanvas.restore()
             }
 
-            // 3. Draw Neon Divider Line
+            // 3. Draw Neon Divider Line (constrained to image height)
             drawLine(
                 color = PrimaryNeonGreen,
-                start = Offset(splitX, 0f),
-                end = Offset(splitX, heightPx),
+                start = Offset(splitX, dstTop),
+                end = Offset(splitX, dstTop + dstH),
                 strokeWidth = 3.dp.toPx()
             )
 
             // 4. Draw Center Drag Handle Circle
-            val centerY = heightPx / 2f
+            val centerY = dstTop + dstH / 2f
             drawCircle(
                 color = PrimaryNeonGreen,
                 radius = 16.dp.toPx(),
