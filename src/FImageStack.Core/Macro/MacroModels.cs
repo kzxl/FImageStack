@@ -163,9 +163,9 @@ public sealed class MacroPipelineConfig
     public AlignmentMode AlignmentMode { get; set; } = AlignmentMode.Similarity;
 
     /// <summary>
-    /// Advanced focus fusion algorithm. Recommended: RegionAdaptive or MultiScalePyramid.
+    /// Advanced focus fusion algorithm. Recommended: MultiScalePyramid for seamless macro DOF.
     /// </summary>
-    public FusionMethod FusionMethod { get; set; } = FusionMethod.RegionAdaptive;
+    public FusionMethod FusionMethod { get; set; } = FusionMethod.MultiScalePyramid;
 
     /// <summary>
     /// Method used to extract high-frequency detail for sharpness maps.

@@ -168,6 +168,16 @@ public sealed class MacroPipelineEngine : IMacroPipelineEngine
                 activeFrames[i].FocusBreathingScale = stackFrames[i].FocusBreathingScale;
                 activeFrames[i].AlignmentHomography = stackFrames[i].AlignmentHomography;
             }
+
+            // CRITICAL: Recompute Focus Maps on warped aligned frames so that sharpness measurements perfectly match pixel coordinates
+            for (int i = 0; i < stackFrames.Count; i++)
+            {
+                if (stackFrames[i].GrayBuffer != null)
+                {
+                    stackFrames[i].FocusMap ??= new ImageBuffer<float>(frameSet.Width, frameSet.Height, 1, PixelFormatType.GrayFloat32);
+                    _focusMeasureEngine.ComputeFocusMap(stackFrames[i].GrayBuffer!, stackFrames[i].FocusMap!, windowRadius: 2);
+                }
+            }
         }
 
         sw.Stop();
