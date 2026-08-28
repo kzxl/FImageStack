@@ -3,18 +3,34 @@ package com.fimagedev.fimagestack.camera
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.ImageFormat
+import android.graphics.Rect
 import android.hardware.camera2.*
+import android.hardware.camera2.params.MeteringRectangle
 import android.media.ImageReader
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.util.Log
-import android.util.Size
+import android.util.Range
 import android.view.Surface
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
+
+enum class FlashMode {
+    OFF,
+    TORCH,
+    AUTO
+}
+
+data class CameraLensInfo(
+    val id: String,
+    val label: String, // "0.6x", "1.0x", "2.0x", "FRONT"
+    val isFront: Boolean,
+    val focalLength: Float
+)
 
 data class MacroBurstConfig(
     val steps: Int = 10,
@@ -28,6 +44,7 @@ class CameraController(private val context: Context) {
     private var cameraDevice: CameraDevice? = null
     private var captureSession: CameraCaptureSession? = null
     private var imageReader: ImageReader? = null
+    private var currentPreviewSurface: Surface? = null
 
     private var backgroundThread: HandlerThread? = null
     private var backgroundHandler: Handler? = null
@@ -38,12 +55,25 @@ class CameraController(private val context: Context) {
     private val _capturedCount = MutableStateFlow(0)
     val capturedCount = _capturedCount.asStateFlow()
 
-    private var minFocusDistanceDiopters = 10.0f
+    var minFocusDistanceDiopters = 10.0f
     var sensorOrientation: Int = 90
+    var activeCameraId: String = "0"
+
+    // Pro Controls State
+    var currentFlashMode: FlashMode = FlashMode.OFF
+    var currentEvStep: Int = 0 // EV offset index
+    var evRange: Range<Int> = Range(-6, 6)
+    var evStepRational: Float = 0.33f
+    var currentZoomRatio: Float = 1.0f
+    var maxZoomRatio: Float = 5.0f
+
+    val availableLenses = mutableListOf<CameraLensInfo>()
 
     fun startBackgroundThread() {
-        backgroundThread = HandlerThread("CameraBackground").also { it.start() }
-        backgroundHandler = Handler(backgroundThread!!.looper)
+        if (backgroundThread == null) {
+            backgroundThread = HandlerThread("CameraBackground").also { it.start() }
+            backgroundHandler = Handler(backgroundThread!!.looper)
+        }
     }
 
     fun stopBackgroundThread() {
@@ -57,27 +87,67 @@ class CameraController(private val context: Context) {
         }
     }
 
+    init {
+        detectAvailableLenses()
+    }
+
+    private fun detectAvailableLenses() {
+        try {
+            availableLenses.clear()
+            for (id in cameraManager.cameraIdList) {
+                val chars = cameraManager.getCameraCharacteristics(id)
+                val facing = chars.get(CameraCharacteristics.LENS_FACING)
+                val focalLengths = chars.get(CameraCharacteristics.LENS_INFO_AVAILABLE_FOCAL_LENGTHS)
+                val focal = focalLengths?.firstOrNull() ?: 4.5f
+
+                val isFront = facing == CameraCharacteristics.LENS_FACING_FRONT
+                val label = if (isFront) "FRONT" else {
+                    when {
+                        focal < 3.0f -> "0.6x"
+                        focal > 6.0f -> "2.0x"
+                        else -> "1.0x"
+                    }
+                }
+                availableLenses.add(CameraLensInfo(id, label, isFront, focal))
+            }
+        } catch (e: Exception) {
+            Log.w("CameraController", "Error detecting lenses: ${e.message}")
+        }
+    }
+
     @SuppressLint("MissingPermission")
     fun openCamera(
         previewSurface: Surface,
+        cameraId: String? = null,
         onOpened: () -> Unit,
         onError: (String) -> Unit
     ) {
+        currentPreviewSurface = previewSurface
+        startBackgroundThread()
+
         try {
-            val cameraId = cameraManager.cameraIdList.firstOrNull { id ->
+            activeCameraId = cameraId ?: cameraManager.cameraIdList.firstOrNull { id ->
                 val chars = cameraManager.getCameraCharacteristics(id)
-                val facing = chars.get(CameraCharacteristics.LENS_FACING)
-                facing == CameraCharacteristics.LENS_FACING_BACK
+                chars.get(CameraCharacteristics.LENS_FACING) == CameraCharacteristics.LENS_FACING_BACK
             } ?: "0"
 
-            val characteristics = cameraManager.getCameraCharacteristics(cameraId)
+            val characteristics = cameraManager.getCameraCharacteristics(activeCameraId)
             minFocusDistanceDiopters = characteristics.get(CameraCharacteristics.LENS_INFO_MINIMUM_FOCUS_DISTANCE) ?: 10.0f
             sensorOrientation = characteristics.get(CameraCharacteristics.SENSOR_ORIENTATION) ?: 90
 
-            // Full resolution ImageReader for high quality burst captures
-            imageReader = ImageReader.newInstance(1920, 1080, ImageFormat.JPEG, 15)
+            evRange = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE) ?: Range(-6, 6)
+            val stepVal = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP)
+            evStepRational = if (stepVal != null && stepVal.denominator != 0) stepVal.numerator.toFloat() / stepVal.denominator else 0.33f
 
-            cameraManager.openCamera(cameraId, object : CameraDevice.StateCallback() {
+            val maxZoom = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                characteristics.get(CameraCharacteristics.CONTROL_ZOOM_RATIO_RANGE)?.upper ?: 5.0f
+            } else 5.0f
+            maxZoomRatio = maxZoom.coerceIn(1.0f, 10.0f)
+
+            // High resolution ImageReader for burst captures
+            imageReader = ImageReader.newInstance(1920, 1080, ImageFormat.JPEG, 20)
+
+            cameraManager.openCamera(activeCameraId, object : CameraDevice.StateCallback() {
                 override fun onOpened(camera: CameraDevice) {
                     cameraDevice = camera
                     createSession(previewSurface, onOpened, onError)
@@ -109,7 +179,6 @@ class CameraController(private val context: Context) {
         cameraDevice?.createCaptureSession(targets, object : CameraCaptureSession.StateCallback() {
             override fun onConfigured(session: CameraCaptureSession) {
                 captureSession = session
-                // Start live preview
                 startPreview(previewSurface)
                 onOpened()
             }
@@ -120,17 +189,109 @@ class CameraController(private val context: Context) {
         }, backgroundHandler)
     }
 
-    private fun startPreview(previewSurface: Surface) {
+    fun startPreview(previewSurface: Surface? = currentPreviewSurface) {
+        val surface = previewSurface ?: return
         try {
             val requestBuilder = cameraDevice?.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW)?.apply {
-                addTarget(previewSurface)
+                addTarget(surface)
                 set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+                applyProControls(this)
             }
             if (requestBuilder != null) {
                 captureSession?.setRepeatingRequest(requestBuilder.build(), null, backgroundHandler)
             }
-        } catch (e: CameraAccessException) {
+        } catch (e: Exception) {
             Log.e("CameraController", "Preview error: ${e.message}")
+        }
+    }
+
+    private fun applyProControls(builder: CaptureRequest.Builder) {
+        // 1. Exposure Compensation
+        builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, currentEvStep.coerceIn(evRange.lower, evRange.upper))
+
+        // 2. Flash / Torch Mode
+        when (currentFlashMode) {
+            FlashMode.OFF -> {
+                builder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
+                builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+            }
+            FlashMode.TORCH -> {
+                builder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_TORCH)
+                builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+            }
+            FlashMode.AUTO -> {
+                builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH)
+            }
+        }
+
+        // 3. Digital Zoom
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            builder.set(CaptureRequest.CONTROL_ZOOM_RATIO, currentZoomRatio)
+        }
+    }
+
+    /**
+     * Updates EV exposure compensation value in real time
+     */
+    fun setExposureCompensation(evStep: Int) {
+        currentEvStep = evStep.coerceIn(evRange.lower, evRange.upper)
+        startPreview()
+    }
+
+    /**
+     * Toggles between Flash OFF, TORCH (constant macro fill light), and AUTO
+     */
+    fun setFlashMode(mode: FlashMode) {
+        currentFlashMode = mode
+        startPreview()
+    }
+
+    /**
+     * Sets digital zoom magnification
+     */
+    fun setZoomRatio(ratio: Float) {
+        currentZoomRatio = ratio.coerceIn(1.0f, maxZoomRatio)
+        startPreview()
+    }
+
+    /**
+     * Tap to Focus and Meter at normalized screen coordinate (0.0 .. 1.0)
+     */
+    fun triggerTapToFocus(normX: Float, normY: Float) {
+        val session = captureSession ?: return
+        val device = cameraDevice ?: return
+        val surface = currentPreviewSurface ?: return
+
+        try {
+            val chars = cameraManager.getCameraCharacteristics(activeCameraId)
+            val sensorRect = chars.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE) ?: Rect(0, 0, 1920, 1080)
+
+            val boxSize = (sensorRect.width() * 0.15f).toInt()
+            val centerX = (normX * sensorRect.width()).toInt()
+            val centerY = (normY * sensorRect.height()).toInt()
+
+            val focusRect = Rect(
+                (centerX - boxSize / 2).coerceIn(0, sensorRect.width() - boxSize),
+                (centerY - boxSize / 2).coerceIn(0, sensorRect.height() - boxSize),
+                (centerX + boxSize / 2).coerceIn(boxSize, sensorRect.width()),
+                (centerY + boxSize / 2).coerceIn(boxSize, sensorRect.height())
+            )
+
+            val meteringRect = MeteringRectangle(focusRect, MeteringRectangle.METERING_WEIGHT_MAX)
+
+            // Trigger AF
+            val triggerBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW).apply {
+                addTarget(surface)
+                set(CaptureRequest.CONTROL_AF_REGIONS, arrayOf(meteringRect))
+                set(CaptureRequest.CONTROL_AE_REGIONS, arrayOf(meteringRect))
+                set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO)
+                set(CaptureRequest.CONTROL_AF_TRIGGER, CaptureRequest.CONTROL_AF_TRIGGER_START)
+                applyProControls(this)
+            }
+            session.capture(triggerBuilder.build(), null, backgroundHandler)
+
+        } catch (e: Exception) {
+            Log.e("CameraController", "Tap-to-focus error: ${e.message}")
         }
     }
 
@@ -185,6 +346,7 @@ class CameraController(private val context: Context) {
                     set(CaptureRequest.LENS_FOCUS_DISTANCE, currentDistance)
                     set(CaptureRequest.JPEG_QUALITY, 95.toByte())
                     set(CaptureRequest.JPEG_ORIENTATION, sensorOrientation)
+                    applyProControls(this)
                 }
                 burstRequests.add(requestBuilder.build())
             }

@@ -5,13 +5,13 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.view.Surface
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.geometry.Offset
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.fimagedev.fimagestack.camera.CameraController
-import com.fimagedev.fimagestack.camera.FocusPeakingAnalyzer
-import com.fimagedev.fimagestack.camera.MacroBurstConfig
+import com.fimagedev.fimagestack.camera.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.io.File
@@ -32,16 +32,34 @@ data class CameraUiState(
     val burstConfig: MacroBurstConfig = MacroBurstConfig(steps = 10, startDistanceDiopters = 10.0f, endDistanceDiopters = 1.0f),
     val isCapturing: Boolean = false,
     val capturedCount: Int = 0,
+
+    // Pro Controls State
+    val flashMode: FlashMode = FlashMode.OFF,
+    val timerSeconds: Int = 0, // 0 (Off), 2, 5
+    val countdownRemaining: Int = 0,
+    val isGridEnabled: Boolean = true,
+    val aspectRatio: String = "4:3",
+    val availableLenses: List<CameraLensInfo> = emptyList(),
+    val selectedLensId: String = "0",
+    val currentEv: Int = 0,
+    val evStepRational: Float = 0.33f,
+    val minEv: Int = -6,
+    val maxEv: Int = 6,
+    val tapFocusPoint: Offset? = null,
+    val zoomRatio: Float = 1.0f,
+
     // Processing Stage
     val currentStage: String = "Quality Assessment",
     val stageDescription: String = "Evaluating frame sharpness and unique in-focus areas...",
     val progressPercentage: Float = 0f,
     val activeFramesCount: Int = 10,
     val culledFramesCount: Int = 0,
+
     // Result View
     val fusedBitmap: Bitmap? = null,
     val rawFirstSliceBitmap: Bitmap? = null,
     val depthMapBitmap: Bitmap? = null,
+    val latestThumbnail: Bitmap? = null,
     val dofPreserved: Float = 78.5f,
     val executionTimeMs: Long = 320L
 )
@@ -64,6 +82,8 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
     private val _effectChannel = Channel<CameraUiEffect>(Channel.BUFFERED)
     val effectFlow = _effectChannel.receiveAsFlow()
 
+    private var activePreviewSurface: Surface? = null
+
     init {
         viewModelScope.launch {
             cameraController.isCapturing.collect { capturing ->
@@ -78,16 +98,100 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun onSurfaceCreated(surface: Surface) {
+        activePreviewSurface = surface
         cameraController.startBackgroundThread()
         cameraController.openCamera(
             previewSurface = surface,
-            onOpened = { /* Preview Active */ },
+            onOpened = {
+                _uiState.update {
+                    it.copy(
+                        availableLenses = cameraController.availableLenses,
+                        selectedLensId = cameraController.activeCameraId,
+                        minEv = cameraController.evRange.lower,
+                        maxEv = cameraController.evRange.upper,
+                        evStepRational = cameraController.evStepRational
+                    )
+                }
+            },
             onError = { err ->
                 viewModelScope.launch {
                     _effectChannel.send(CameraUiEffect.ShowToast(err))
                 }
             }
         )
+    }
+
+    // Pro Toolbar Controls
+    fun toggleFlash() {
+        val next = when (_uiState.value.flashMode) {
+            FlashMode.OFF -> FlashMode.TORCH
+            FlashMode.TORCH -> FlashMode.AUTO
+            FlashMode.AUTO -> FlashMode.OFF
+        }
+        cameraController.setFlashMode(next)
+        _uiState.update { it.copy(flashMode = next) }
+    }
+
+    fun toggleTimer() {
+        val next = when (_uiState.value.timerSeconds) {
+            0 -> 2
+            2 -> 5
+            else -> 0
+        }
+        _uiState.update { it.copy(timerSeconds = next) }
+    }
+
+    fun toggleGrid() {
+        _uiState.update { it.copy(isGridEnabled = !it.isGridEnabled) }
+    }
+
+    fun toggleAspectRatio() {
+        val next = when (_uiState.value.aspectRatio) {
+            "4:3" -> "16:9"
+            "16:9" -> "1:1"
+            else -> "4:3"
+        }
+        _uiState.update { it.copy(aspectRatio = next) }
+    }
+
+    fun setExposure(ev: Int) {
+        cameraController.setExposureCompensation(ev)
+        _uiState.update { it.copy(currentEv = ev) }
+    }
+
+    fun switchLens(lens: CameraLensInfo) {
+        val surface = activePreviewSurface ?: return
+        cameraController.close()
+        cameraController.openCamera(
+            previewSurface = surface,
+            cameraId = lens.id,
+            onOpened = {
+                _uiState.update {
+                    it.copy(
+                        selectedLensId = lens.id,
+                        minEv = cameraController.evRange.lower,
+                        maxEv = cameraController.evRange.upper
+                    )
+                }
+            },
+            onError = { err ->
+                viewModelScope.launch { _effectChannel.send(CameraUiEffect.ShowToast(err)) }
+            }
+        )
+    }
+
+    fun onTapToFocus(offset: Offset, viewWidth: Float, viewHeight: Float) {
+        val normX = (offset.x / viewWidth).coerceIn(0f, 1f)
+        val normY = (offset.y / viewHeight).coerceIn(0f, 1f)
+
+        cameraController.triggerTapToFocus(normX, normY)
+        _uiState.update { it.copy(tapFocusPoint = offset) }
+
+        // Auto dismiss focus reticle after 2.5s
+        viewModelScope.launch {
+            delay(2500)
+            _uiState.update { if (it.tapFocusPoint == offset) it.copy(tapFocusPoint = null) else it }
+        }
     }
 
     fun togglePeaking() {
@@ -116,6 +220,23 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
     }
 
     fun startBurstCapture() {
+        val timer = _uiState.value.timerSeconds
+        if (timer > 0) {
+            viewModelScope.launch {
+                for (sec in timer downTo 1) {
+                    _uiState.update { it.copy(countdownRemaining = sec) }
+                    _effectChannel.send(CameraUiEffect.TriggerHapticFeedback)
+                    delay(1000)
+                }
+                _uiState.update { it.copy(countdownRemaining = 0) }
+                executeBurstCapture()
+            }
+        } else {
+            executeBurstCapture()
+        }
+    }
+
+    private fun executeBurstCapture() {
         val cacheDir = getApplication<Application>().cacheDir
         val burstDir = File(cacheDir, "macro_burst_${System.currentTimeMillis()}").also { it.mkdirs() }
 
@@ -150,7 +271,7 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
                     progressPercentage = 15f
                 )
             }
-            kotlinx.coroutines.delay(100)
+            delay(100)
 
             _uiState.update {
                 it.copy(
@@ -159,7 +280,7 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
                     progressPercentage = 45f
                 )
             }
-            kotlinx.coroutines.delay(120)
+            delay(120)
 
             _uiState.update {
                 it.copy(
@@ -168,7 +289,7 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
                     progressPercentage = 75f
                 )
             }
-            kotlinx.coroutines.delay(100)
+            delay(100)
 
             _uiState.update {
                 it.copy(
@@ -177,7 +298,7 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
                     progressPercentage = 95f
                 )
             }
-            kotlinx.coroutines.delay(80)
+            delay(80)
 
             var firstBmp: Bitmap? = null
             if (files.isNotEmpty()) {
@@ -191,6 +312,7 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
                     screenState = AppScreenState.ResultViewer,
                     rawFirstSliceBitmap = firstBmp,
                     fusedBitmap = firstBmp,
+                    latestThumbnail = firstBmp,
                     executionTimeMs = elapsed
                 )
             }
@@ -210,7 +332,6 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
                 androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_180 -> 180f
                 androidx.exifinterface.media.ExifInterface.ORIENTATION_ROTATE_270 -> 270f
                 else -> {
-                    // Fallback to camera sensor orientation if Exif orientation was not set
                     cameraController.sensorOrientation.toFloat()
                 }
             }
@@ -230,6 +351,12 @@ class MainCameraViewModel(application: Application) : AndroidViewModel(applicati
 
     fun backToCamera() {
         _uiState.update { it.copy(screenState = AppScreenState.CameraCapture) }
+    }
+
+    fun openLatestResult() {
+        if (_uiState.value.fusedBitmap != null) {
+            _uiState.update { it.copy(screenState = AppScreenState.ResultViewer) }
+        }
     }
 
     override fun onCleared() {
