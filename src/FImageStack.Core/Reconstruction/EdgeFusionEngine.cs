@@ -117,32 +117,29 @@ public sealed class EdgeFusionEngine : IEdgeFusionEngine
                 int idx = row + x;
                 if (maskPtr[idx] < 0.5f) continue;
 
-                // Find candidate frame with strongest consistent edge inside the local patch
+                // Find candidate frame with strongest genuine focus sharpness inside the local patch
                 int bestFrameIdx = mapPtr[idx];
-                float maxEdgeEnergy = 0f;
+                float maxFocusEnergy = 0f;
 
                 for (int f = 0; f < count; f++)
                 {
                     var sf = sourceFrames[f];
-                    if (sf.GrayBuffer == null) continue;
-                    float* gPtr = sf.GrayBuffer.DataPointer;
+                    if (sf.FocusMap == null) continue;
+                    float* fPtr = sf.FocusMap.DataPointer;
 
-                    float localEnergy = 0f;
+                    float localFocus = 0f;
                     for (int py = -patchRadius; py <= patchRadius; py++)
                     {
                         int sRow = (y + py) * w;
                         for (int px = -patchRadius; px <= patchRadius; px++)
                         {
-                            float g1 = gPtr[sRow + x + px + 1];
-                            float g0 = gPtr[sRow + x + px - 1];
-                            float eg = MathF.Abs(g1 - g0);
-                            localEnergy += eg;
+                            localFocus += fPtr[sRow + x + px];
                         }
                     }
 
-                    if (localEnergy > maxEdgeEnergy)
+                    if (localFocus > maxFocusEnergy)
                     {
-                        maxEdgeEnergy = localEnergy;
+                        maxFocusEnergy = localFocus;
                         bestFrameIdx = f;
                     }
                 }

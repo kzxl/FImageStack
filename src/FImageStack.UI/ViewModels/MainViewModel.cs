@@ -179,7 +179,7 @@ public sealed class MainViewModel : ViewModelBase
     private float _clarityAdjustment = 0.0f;
     private float _sharpeningAdjustment = 0.3f;
     private float _saturationAdjustment = 1.0f;
-    private ToneMappingOperator _selectedToneMapping = ToneMappingOperator.ACESFilmic;
+    private ToneMappingOperator _selectedToneMapping = ToneMappingOperator.LinearPreserve;
 
     // Metrics & Histogram
     private string _qualityScoreText = "--";
