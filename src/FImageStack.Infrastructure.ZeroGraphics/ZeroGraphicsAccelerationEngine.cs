@@ -243,9 +243,63 @@ public sealed class ZeroGraphicsAccelerationEngine : IGpuAccelerationEngine, IDi
         return _cpuFallback.UpsamplePyramidGpu(src, targetW, targetH);
     }
 
-    public ImageBuffer<float> ApplyToneMappingGpu(ImageBuffer<float> hdrBuffer, FImageStack.Core.ToneMappingOperator op)
+    public unsafe ImageBuffer<float> ApplyToneMappingGpu(ImageBuffer<float> hdrBuffer, FImageStack.Core.ToneMappingOperator op)
     {
-        return _cpuFallback.ApplyToneMappingGpu(hdrBuffer, op);
+        if (_context == null || _hdrToneMapper == null || _currentDevice.Backend == GpuBackendType.CpuSimd)
+        {
+            return _cpuFallback.ApplyToneMappingGpu(hdrBuffer, op);
+        }
+
+        int width = hdrBuffer.Width;
+        int height = hdrBuffer.Height;
+        var pool = _context.TexturePool;
+
+        var hdrTex = pool.Acquire(width, height, DXGI_FORMAT.DXGI_FORMAT_B8G8R8A8_UNORM, needsUav: false);
+
+        try
+        {
+            UploadRgbFloatToBgraTexture(hdrBuffer, hdrTex.Texture);
+
+            var zeroOp = op switch
+            {
+                FImageStack.Core.ToneMappingOperator.ReinhardExtended => global::ZeroGraphics.Imaging.Gpu.ToneMappingOperator.Reinhard,
+                FImageStack.Core.ToneMappingOperator.ACESFilmic => global::ZeroGraphics.Imaging.Gpu.ToneMappingOperator.AcesFilmic,
+                _ => global::ZeroGraphics.Imaging.Gpu.ToneMappingOperator.LinearClamp
+            };
+
+            using var sdrTex = _hdrToneMapper.ToneMap(hdrTex, zeroOp, exposure: 0.0f, gamma: 2.2f);
+
+            var output = new ImageBuffer<float>(width, height, 3, PixelFormatType.RgbFloat32);
+            using var zeroBuf = new global::ZeroGraphics.Imaging.Core.ImageBuffer(width, height, global::ZeroGraphics.Imaging.Core.ImageFormatMode.Bgra32);
+            _context.Transfer.Download(sdrTex.Texture, zeroBuf);
+
+            byte* pSrc = zeroBuf.Scan0;
+            float* pDst = output.DataPointer;
+            int stride = zeroBuf.Stride;
+            const float inv255 = 1.0f / 255.0f;
+
+            for (int y = 0; y < height; y++)
+            {
+                byte* srcRow = pSrc + y * stride;
+                int dstRowOffset = y * width;
+
+                for (int x = 0; x < width; x++)
+                {
+                    int sIdx = x * 4;
+                    int dIdx = (dstRowOffset + x) * 3;
+
+                    pDst[dIdx] = srcRow[sIdx + 2] * inv255;
+                    pDst[dIdx + 1] = srcRow[sIdx + 1] * inv255;
+                    pDst[dIdx + 2] = srcRow[sIdx] * inv255;
+                }
+            }
+
+            return output;
+        }
+        finally
+        {
+            pool.Release(hdrTex);
+        }
     }
 
     private unsafe void UploadGrayFloatToBgraTexture(ImageBuffer<float> src, D3D11Texture2D dstTexture)
