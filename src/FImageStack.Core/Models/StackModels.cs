@@ -142,6 +142,7 @@ public sealed class FusionSettings
     public SuperResolution.SuperResolutionParams SuperResolutionParams { get; set; } = new();
     public bool EnableAutoFrameSelection { get; set; } = false;
     public bool EnableStackSimulation { get; set; } = true;
+    public bool EnableGpuAcceleration { get; set; } = true;
 
     public ResolutionMode RenderMode { get; set; } = ResolutionMode.FastPreview1280;
     public int PreviewMaxDimension { get; set; } = 1280;

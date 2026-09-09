@@ -25,6 +25,7 @@ using FImageStack.Core.Retouch;
 using FImageStack.Core.Selection;
 using FImageStack.Core.SuperResolution.Drizzle;
 using FImageStack.Infrastructure.IO;
+using FImageStack.Infrastructure.ZeroGraphics;
 using FImageStack.UI.Common;
 using FImageStack.UI.Utils;
 using Microsoft.Win32;
@@ -918,10 +919,18 @@ public sealed class MainViewModel : ViewModelBase
     {
         _imageIO = new ImageSharpIO();
         _projectService = new ProjectService();
-        _stackService = new StackService(_imageIO);
+        try
+        {
+            _gpuEngine = new ZeroGraphicsAccelerationEngine();
+        }
+        catch (Exception ex)
+        {
+            Debug.WriteLine($"Failed to initialize ZeroGraphics hardware accelerator: {ex.Message}");
+            _gpuEngine = new StandardGpuAccelerationEngine();
+        }
+        _stackService = new StackService(_imageIO, gpuEngine: _gpuEngine);
         _postProcessEngine = new StandardPostProcessEngine();
         _frameSelector = new SmartFrameSelector();
-        _gpuEngine = new StandardGpuAccelerationEngine();
 
         foreach (var dev in _gpuEngine.GetAvailableDevices())
         {
@@ -1823,6 +1832,7 @@ public sealed class MainViewModel : ViewModelBase
                     EnableEdgeReconstruction = EnableEdgeReconstruction,
                     EnableTiledProcessing = EnableTiledProcessing,
                     TileSize = _tileSize,
+                    EnableGpuAcceleration = SelectedGpuDevice?.IsHardwareAccelerated ?? false,
                     RenderMode = SelectedRenderMode,
                     PreviewMaxDimension = 1280
                 };

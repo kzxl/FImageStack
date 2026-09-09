@@ -28,35 +28,36 @@ public interface IGpuAccelerationEngine
     ImageBuffer<float> DownsamplePyramidGpu(ImageBuffer<float> src);
     ImageBuffer<float> UpsamplePyramidGpu(ImageBuffer<float> src, int targetW, int targetH);
     ImageBuffer<float> ApplyToneMappingGpu(ImageBuffer<float> hdrBuffer, ToneMappingOperator op);
+    ImageBuffer<float> FuseStackGpu(IReadOnlyList<ImageBuffer<float>> frames);
 }
 
 public sealed class StandardGpuAccelerationEngine : IGpuAccelerationEngine
 {
     private readonly List<GpuDeviceInfo> _devices = new();
     private GpuDeviceInfo _currentDevice;
-    private GpuBackendType _activeBackend = GpuBackendType.Auto;
+    private GpuBackendType _activeBackend = GpuBackendType.CpuSimd;
 
     public StandardGpuAccelerationEngine()
     {
         DiscoverGpuDevices();
-        _currentDevice = _devices.FirstOrDefault(d => d.IsHardwareAccelerated) ?? _devices[0];
+        _currentDevice = _devices[0];
     }
 
     private void DiscoverGpuDevices()
     {
         _devices.Clear();
 
-        // 1. DirectCompute / DirectX 12 Universal Backend
+        // 1. DirectCompute / DirectX Hardware Backend
         _devices.Add(new GpuDeviceInfo
         {
-            DeviceName = "DirectX 12 / DirectCompute (Universal)",
+            DeviceName = "DirectX DirectCompute Accelerator",
             VendorName = "Microsoft DirectCompute",
             TotalVramBytes = 8L * 1024 * 1024 * 1024,
             IsHardwareAccelerated = true,
             Backend = GpuBackendType.DirectCompute
         });
 
-        // 2. DirectML Machine Learning Backend
+        // 2. DirectML Neural Engine Backend
         _devices.Add(new GpuDeviceInfo
         {
             DeviceName = "DirectML Neural Accelerator",
@@ -66,25 +67,14 @@ public sealed class StandardGpuAccelerationEngine : IGpuAccelerationEngine
             Backend = GpuBackendType.DirectML
         });
 
-        // 3. NVIDIA CUDA Engine (if on Windows)
-        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
-        {
-            _devices.Add(new GpuDeviceInfo
-            {
-                DeviceName = "NVIDIA CUDA Hardware Stream",
-                VendorName = "NVIDIA Corporation",
-                TotalVramBytes = 12L * 1024 * 1024 * 1024,
-                IsHardwareAccelerated = true,
-                Backend = GpuBackendType.Cuda
-            });
-        }
-
-        // 4. CPU AVX2/AVX-512 SIMD Fallback
+        // 3. CPU Host Multi-Thread SIMD Fallback
         _devices.Add(new GpuDeviceInfo
         {
-            DeviceName = "CPU AVX2 / AVX-512 Native Multi-Thread",
+            DeviceName = "CPU Host Multi-Thread SIMD (AVX2/AVX-512)",
             VendorName = "Host Processor",
-            TotalVramBytes = 32L * 1024 * 1024 * 1024,
+            TotalVramBytes = (long)(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes > 0 
+                ? (ulong)GC.GetGCMemoryInfo().TotalAvailableMemoryBytes 
+                : 16UL * 1024 * 1024 * 1024),
             IsHardwareAccelerated = false,
             Backend = GpuBackendType.CpuSimd
         });
@@ -269,6 +259,52 @@ public sealed class StandardGpuAccelerationEngine : IGpuAccelerationEngine
         });
 
         return output;
+    }
+
+    public unsafe ImageBuffer<float> FuseStackGpu(IReadOnlyList<ImageBuffer<float>> frames)
+    {
+        if (frames == null || frames.Count == 0)
+            throw new ArgumentException("At least one frame is required.", nameof(frames));
+
+        int w = frames[0].Width;
+        int h = frames[0].Height;
+        int channels = frames[0].Channels;
+        var composite = new ImageBuffer<float>(w, h, channels, frames[0].Format);
+
+        // Fallback: CPU Winner-Takes-All sharpness blending
+        using var bestSharpness = new ImageBuffer<float>(w, h, 1);
+        float* bestPtr = bestSharpness.DataPointer;
+        float* compPtr = composite.DataPointer;
+
+        for (int i = 0; i < frames.Count; i++)
+        {
+            var frame = frames[i];
+            using var measure = ComputeFocusMeasureGpu(frame, FocusMeasureMethod.ModifiedLaplacian);
+            float* measurePtr = measure.DataPointer;
+            float* srcPtr = frame.DataPointer;
+
+            Parallel.For(0, h, y =>
+            {
+                int rowOffset = y * w;
+                for (int x = 0; x < w; x++)
+                {
+                    int idx = rowOffset + x;
+                    float s = measurePtr[idx];
+
+                    if (i == 0 || s > bestPtr[idx])
+                    {
+                        bestPtr[idx] = s;
+                        int cIdx = idx * channels;
+                        for (int c = 0; c < channels; c++)
+                        {
+                            compPtr[cIdx + c] = srcPtr[cIdx + c];
+                        }
+                    }
+                }
+            });
+        }
+
+        return composite;
     }
 
     private static float AcesFilmicCurve(float x)

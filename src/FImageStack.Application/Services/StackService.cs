@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using FImageStack.Core;
+using FImageStack.Core.Acceleration;
 using FImageStack.Core.Alignment;
 using FImageStack.Core.Artifact;
 using FImageStack.Core.Astro;
@@ -112,6 +113,7 @@ public sealed class StackService : IStackService
     private readonly IBayerFusionEngine _bayerFusionEngine;
     private readonly IDemosaicEngine _demosaicEngine;
     private readonly IDrizzleEngine _drizzleEngine;
+    private readonly IGpuAccelerationEngine _gpuEngine;
 
     public StackService(
         IImageIO imageIO,
@@ -136,7 +138,8 @@ public sealed class StackService : IStackService
         IDehazeEngine? dehazeEngine = null,
         IBayerFusionEngine? bayerFusionEngine = null,
         IDemosaicEngine? demosaicEngine = null,
-        IDrizzleEngine? drizzleEngine = null)
+        IDrizzleEngine? drizzleEngine = null,
+        IGpuAccelerationEngine? gpuEngine = null)
     {
         _imageIO = imageIO;
         _alignmentEngine = alignmentEngine ?? new AdvancedAlignmentEngine();
@@ -161,6 +164,7 @@ public sealed class StackService : IStackService
         _bayerFusionEngine = bayerFusionEngine ?? new BayerFusionEngine();
         _demosaicEngine = demosaicEngine ?? new EdgeDirectedDemosaicEngine();
         _drizzleEngine = drizzleEngine ?? new DrizzleEngine();
+        _gpuEngine = gpuEngine ?? new StandardGpuAccelerationEngine();
     }
 
 
@@ -299,12 +303,21 @@ public sealed class StackService : IStackService
                 _ => new ModifiedLaplacianFocusMeasure()
             };
 
+            bool isGpuActive = settings.EnableGpuAcceleration && _gpuEngine.GetCurrentDevice().IsHardwareAccelerated;
+
             for (int i = 0; i < frames.Count; i++)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var f = frames[i];
-                f.FocusMap = new ImageBuffer<float>(f.Width, f.Height, 1);
-                focusEngine.ComputeFocusMap(f.GrayBuffer!, f.FocusMap, settings.SmoothingRadius);
+                if (isGpuActive)
+                {
+                    f.FocusMap = _gpuEngine.ComputeFocusMeasureGpu(f.GrayBuffer!, settings.FocusMethod);
+                }
+                else
+                {
+                    f.FocusMap = new ImageBuffer<float>(f.Width, f.Height, 1);
+                    focusEngine.ComputeFocusMap(f.GrayBuffer!, f.FocusMap, settings.SmoothingRadius);
+                }
                 progress?.Report(new StackProgress("Focus Measure", (double)(i + 1) / frames.Count * 100, $"Sharpness calculated for frame {i + 1}/{frames.Count}"));
             }
 
@@ -348,7 +361,12 @@ public sealed class StackService : IStackService
                 _ => new MultiScalePyramidFusionEngine()
             };
 
-            if (settings.EnableTiledProcessing)
+            if (isGpuActive && settings.Method == FusionMethod.WinnerTakesAll && !settings.EnableTiledProcessing)
+            {
+                progress?.Report(new StackProgress("Focus Fusion", 0, "Applying Direct3D 11 GPU hardware fusion..."));
+                result.FusedImage = await Task.Run(() => _gpuEngine.FuseStackGpu(frames.Select(f => f.ColorBuffer!).ToList()), cancellationToken);
+            }
+            else if (settings.EnableTiledProcessing)
             {
                 progress?.Report(new StackProgress("Tiled Fusion", 0, $"Fusing in {settings.TileSize}x{settings.TileSize} memory-bounded tiles..."));
                 result.FusedImage = await Task.Run(() => _tiledProcessor.ProcessTiled(frames, result.DepthResult, fusionEngine, settings, settings.TileSize, 64, progress), cancellationToken);

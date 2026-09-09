@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Description>High-performance Direct3D 11 GPU acceleration adapter for FImageStack powered by ZeroGraphics.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\FImageStack.Core\FImageStack.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ZeroGraphics.Core" Version="1.0.1" />
+    <PackageReference Include="ZeroGraphics.DirectX" Version="1.0.1" />
+    <PackageReference Include="ZeroGraphics.Imaging" Version="1.0.1" />
+  </ItemGroup>
+
+</Project>

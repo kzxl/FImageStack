@@ -6,7 +6,7 @@ using FImageStack.Core.Models;
 namespace FImageStack.Core.Native;
 
 /// <summary>
-/// High-performance C-ABI Native Bridge for iOS (Swift), Android (Kotlin/NDK), and C++ integration.
+/// High-performance C-ABI Native Bridge for C++ and external native tool integration.
 /// Functions use UnmanagedCallersOnly to avoid any runtime marshaling overhead.
 /// </summary>
 public static unsafe class MacroNativeBridge
