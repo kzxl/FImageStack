@@ -32,6 +32,20 @@ FImageStack Desktop Studio & GPU Fusion Architecture
 
 ---
 
+## 📚 Tài Liệu Kỹ Thuật & Hướng Dẫn Kiến Trúc (Technical Documentation)
+
+Toàn bộ tài liệu chi tiết, công thức toán học và hướng dẫn phát triển được mô-đun hóa trong thư mục [`docs/`](docs/):
+
+| Tài liệu | Mô tả |
+| :--- | :--- |
+| 🏛️ **[Core Architecture](docs/ARCHITECTURE.md)** | Kiến trúc Clean Layered Architecture, Universe Plugin v4.0, mô hình Zero GC Memory. |
+| 🔬 **[Computational Algorithms](docs/ALGORITHMS.md)** | Công thức và giải thuật 9 phân hệ: Focus Stacking, Mertens HDR, Drizzle, Astro, 3D Mesh. |
+| ⚡ **[ZeroGraphics D3D11 GPU Engine](docs/ZEROGRAPHICS_GPU.md)** | Direct3D 11 Compute Shaders, DMA Texture Ingestion, Flip Model SwapChain sub-4ms. |
+| 🍳 **[Developer Cookbook & Recipes](docs/RECIPES.md)** | 10 mẫu code thực chiến: headless pipeline, 3D export, GPU dispatch, CLI batch. |
+| 📊 **[Verified Benchmarks](docs/BENCHMARKS.md)** | Đo kiểm FPS, tải CPU, thông lượng SIMD vs D3D11 Compute và footprint bộ nhớ. |
+
+---
+
 ## 🖼️ Bộ Ảnh Mẫu Kiểm Thử Trực Quan (Visual Demo Samples)
 
 Các kết quả thực nghiệm được xử lý trực tiếp từ các tập dữ liệu chụp thực tế trong thư mục `data/`:
