@@ -1,22 +1,22 @@
 # 🔬 FImageStack (FStack) — Next-Gen Computational Imaging & Pro Macro Photography Platform
 
 [![.NET 9.0](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![Android 15 Client](https://img.shields.io/badge/Android-Jetpack%20Compose%20%2B%20NDK-3DDC84?logo=android&logoColor=white)](android/)
+[![ZeroGraphics Engine](https://img.shields.io/badge/GPU-Direct3D%2011%20ZeroGraphics-0078D7?logo=directx&logoColor=white)](https://github.com/kzxl/ZeroPlatform)
 [![WPF Studio](https://img.shields.io/badge/GUI-WPF%20Studio%20Dark-blue?logo=windows&logoColor=white)](src/FImageStack.UI/)
 [![Tests](https://img.shields.io/badge/Unit%20Tests-114%2F114%20PASS%20(100%25)-10B981)](#-kiểm-thử--chất-lượng)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20x64%20%7C%20Android%20ARM64-0284C7)](https://github.com/)
+[![Platform](https://img.shields.io/badge/Platform-Windows%20x64%20%7C%20Direct3D%2011-0284C7)](https://github.com/)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
-**FImageStack** là một nền tảng **Nhiếp ảnh Tính toán (Computational Imaging Platform)** thế hệ mới, hỗ trợ song song cả ứng dụng **Desktop Studio (.NET 9 WPF + C++ Native)** và ứng dụng di động thực địa **Android Pro Macro Camera (Jetpack Compose + Camera2 + NDK SIMD)**.
+**FImageStack** là một nền tảng **Nhiếp ảnh Tính toán & Đo lường Quang học (Computational Imaging & Industrial Metrology Platform)** thế hệ mới, tối ưu hóa toàn diện cho **Desktop Studio (.NET 9 WPF + Direct3D 11 ZeroGraphics GPU + C++ Native SIMD)**.
 
-Hệ thống tích hợp 8 phân hệ xử lý ảnh tính toán hiện đại: Focus Stacking siêu phân giải vi mô (Macro/Microscopy), Khử nhiễu thống kê đa khung hình (Statistical Noise), HDR dải tương phản cao (Mertens/Debevec), Thiên văn sâu (Astrophotography), Siêu phân giải không gian (HST Subpixel Drizzle), Phục hồi quang học (Deconvolution/Dehazing), Tái tạo mô hình 3D (PLY/OBJ) và Ghép chồng dữ liệu thô cảm biến (Computational RAW Bayer Fusion).
+Hệ thống tích hợp 9 phân hệ xử lý ảnh tính toán hiện đại: Focus Stacking siêu phân giải vi mô (Macro/Microscopy), Khử nhiễu thống kê đa khung hình (Statistical Noise), HDR dải tương phản cao (Mertens/Debevec), Thiên văn sâu (Astrophotography), Siêu phân giải không gian (HST Subpixel Drizzle), Phục hồi quang học (Deconvolution/Dehazing), Tái tạo mô hình 3D (PLY/OBJ), Ghép chồng dữ liệu thô cảm biến (Computational RAW Bayer Fusion), và Tăng tốc phần cứng GPU Direct3D 11 không độ trễ.
 
 ---
 
 ## 🏛️ Sơ Đồ Kiến Trúc Nền Tảng (Core Architecture)
 
 ```text
-FImageStack Platform (Desktop Studio & Mobile Pro Camera)
+FImageStack Desktop Studio & GPU Fusion Architecture
 │
 ├── 1. Focus Stacking ────────── Multi-Scale Laplacian Pyramid, Wavelet DWT, Focus Volume 3D, Virtual Aperture DOF
 ├── 2. Noise Stacking ────────── SIMD Mean, Median, Kappa-Sigma Clipping, Winsorized, Streaming O(1) RAM
@@ -27,7 +27,7 @@ FImageStack Platform (Desktop Studio & Mobile Pro Camera)
 ├── 7. 3D Depth Reconstruction ─ Continuous Depth Maps, Sobel Surface Normals, Point Cloud (.ply), 3D Mesh (.obj)
 ├── 8. Image Alignment ───────── 6-DOF Affine, 8-DOF Homography, Optical Flow, Elastic Local Mesh Warping
 ├── 9. Computational RAW ─────── Bayer CFA Mosaic Fusion trước Demosaic (Google HDR+), Edge-Directed Demosaic
-└── 10. Android Pro Camera ───── Camera2 Manual Focus Dial, Hardware SIMD Peaking, Sub-Part Mosaic Stacking
+└── 10. ZeroGraphics Engine ──── D3D11 Compute Shaders, Flip Model SwapChain (sub-4ms), 144Hz Zoom/Pan Viewport
 ```
 
 ---
@@ -74,30 +74,20 @@ Các kết quả thực nghiệm được xử lý trực tiếp từ các tập
 | ![Mosaic Result](data/demo_multi_region_result.png) | ![Occlusion Compare](data/compare_occlusion.png) |
 | *Ghép ma trận phân vùng liền mạch không vệt đen* | *Khử triệt để viền mờ halo khi các lớp chồng lên nhau* |
 
----
+## ⚡ Tăng Tốc Phần Cứng & Khung Ngắm Công Nghiệp (ZeroGraphics Direct3D 11 Engine)
 
-## 📱 Ứng Dụng Di Động Android (FImageStack Pro Mobile Client)
+Hệ thống tích hợp trực tiếp kiến trúc **ZeroGraphics GPU Acceleration**:
 
-Nằm tại thư mục `android/`, ứng dụng Android mang sức mạnh xử lý Focus Stacking trực tiếp ra thực địa:
-
-* **Công nghệ cốt lõi**: Kotlin + Jetpack Compose (Material 3 Dark Theme) + Camera2 API cấp thấp + NDK C++ SIMD (`-O3 -static-openmp`).
-* **Lấy nét thủ công thời gian thực (Manual Focus & Diopter Dial)**:
-  * Khóa hoàn toàn autofocus gây sai nét (`CONTROL_AF_MODE_OFF`).
-  * Điều khiển trực tiếp motor thấu kính vật lý qua thanh trượt Diopter ($0.5\text{D} \rightarrow 10.0\text{D}$ tương đương $\infty \rightarrow 10\text{cm}$).
-  * **Hiệu chuẩn 1 chạm (1-Tap Calibration)**: Nút `[SET NEAR]` và `[SET FAR]` để thiết lập chặn trên/chặn dưới cho chuỗi chụp Focus Bracketing tự động.
-* **Focus Peaking phần cứng siêu tốc (Zero-Copy C++ SIMD)**:
-  * Trích xuất trực tiếp kênh độ sáng **Y (Luminance)** từ luồng $60\text{fps}$ `ImageReader(YUV_420_888)`.
-  * Vi sai 2D Laplacian với 5 bảng màu Neon (Xanh lá, Đỏ, Vàng, Cyan, Hồng) hoặc chế độ nền đen trắng (Monochrome).
-* **Ghép nối Đa mảnh Ma trận (Sub-Part Mosaic Stacking)**:
-  * Chế độ **`[🔲 MOSAIC]`** hỗ trợ chụp từng góc mẫu vật lớn ($2 \times 2$ Grid hoặc $1 \times 2$ Panorama).
-  * Bản đồ thu nhỏ `SubPartMosaicHud` theo dõi tiến độ từng mảnh và tự động chuyển ô tiếp theo.
-  * Bấm **`⚡ STITCH`** để tự động căn chỉnh và hòa trộn biên mượt mà (Seam Feathering).
-* **Khung ngắm chuẩn tỉ lệ 1:1 không méo hình (True Sensor Aspect Ratio)**:
-  * Tự động căn chỉnh theo cảm biến phần cứng ($4:3$, $16:9$, $1:1$), loại bỏ hoàn toàn hiện tượng kéo dãn hình ảnh.
-  * Chế độ so sánh A/B (Split Comparison View) với thanh trượt tương tác hiển thị đúng tỷ lệ quang học.
-* **Tự động lưu thư viện & Chia sẻ (Gallery Auto-Save & Native Share)**:
-  * Tự động lưu ảnh Master JPEG $98\%$ vào album `Bộ nhớ máy > Pictures > FImageStack` qua chuẩn `MediaStore API`.
-  * Nút Share tích hợp `FileProvider` gửi ảnh trực tiếp qua Zalo, Telegram, Google Drive, Gmail.
+* **Direct3D 11 Compute Shaders**:
+  * Đo độ nét Modified Laplacian và hòa trộn năng lượng tập trung trực tiếp trên GPU VRAM (`CsFocusMeasure`, `CsFocusBlend`), giảm thời gian xử lý chuỗi 30-50 frame xuống sub-second.
+  * Đường cong nén dải động cao HDR Tone Mapping (`ACES Filmic`, `Reinhard`) thực thi bằng shader FP32 song song.
+  * Tự động điều phối chia khối đa phân vùng `GigapixelTileScheduler` cho các ảnh cực lớn (200MP+) không tràn bộ nhớ VRAM.
+* **Khung Ngắm Flip Model SwapChain (Zero-Latency Studio Viewport)**:
+  * Cơ chế trình chiếu `DXGI_SWAP_EFFECT_FLIP_DISCARD` loại bỏ hoàn toàn chi phí DWM Redirection Copy của WPF.
+  * Độ trễ đáp ứng `< 4ms`, tiết kiệm 100% CPU khi màn hình ở trạng thái tĩnh.
+  * Thao tác cuộn chuột Zoom In/Out mượt mà tại tâm con trỏ chuột, Pan di chuyển đa hướng với tần số quét 60 - 144Hz.
+* **Zero-Allocation DMA Texture Ingestion**:
+  * Đẩy thẳng con trỏ unmanaged pointer (`IntPtr` / `float*`) từ bộ đệm `ImageBuffer` lên GPU Texture qua DMA không sinh rác trên .NET GC Heap.
 
 ---
 
@@ -210,19 +200,6 @@ dotnet publish src/FImageStack.UI/FImageStack.UI.csproj -c Release -r win-x64 --
 
 # Option 2: Lite Framework-Dependent (Siêu nhẹ)
 dotnet publish src/FImageStack.UI/FImageStack.UI.csproj -c Release -r win-x64 --self-contained false -p:PublishSingleFile=true -o ./publish/FImageStack-UI-Lite
-```
-
-### 3. Build & Cài Đặt Android App (.APK)
-```powershell
-# 1-Click Build Android APK (Root Batch script)
-.\build_android.bat
-
-# Hoặc dùng Gradle Wrapper trực tiếp:
-cd android
-.\gradlew.bat assembleDebug
-
-# Cài đặt file APK trực tiếp vào điện thoại qua ADB:
-adb install -r "android/app/build/outputs/apk/debug/app-debug.apk"
 ```
 
 ---
