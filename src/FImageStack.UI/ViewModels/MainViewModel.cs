@@ -23,6 +23,7 @@ using FImageStack.Core.Refocus;
 using FImageStack.Core.Restoration;
 using FImageStack.Core.Retouch;
 using FImageStack.Core.Selection;
+using FImageStack.Core.Stitching;
 using FImageStack.Core.SuperResolution.Drizzle;
 using FImageStack.Infrastructure.IO;
 using FImageStack.Infrastructure.ZeroGraphics;
@@ -858,6 +859,19 @@ public sealed class MainViewModel : ViewModelBase
     public bool HdrDeghosting { get => _hdrDeghosting; set => SetProperty(ref _hdrDeghosting, value); }
     public float DrizzleScale { get => _drizzleScale; set => SetProperty(ref _drizzleScale, value); }
     public float DrizzlePixFrac { get => _drizzlePixFrac; set => SetProperty(ref _drizzlePixFrac, value); }
+
+    // Mosaic Stitching Parameters
+    private StitchProjectionMode _selectedProjectionMode = StitchProjectionMode.Planar;
+    private SeamBlendingMode _selectedBlendingMode = SeamBlendingMode.LinearFeathering;
+    private float _stitchOverlapRatio = 0.30f;
+    private bool _enableStitchGainCompensation = true;
+    private float _stitchFeatherRadius = 0.10f;
+
+    public StitchProjectionMode SelectedProjectionMode { get => _selectedProjectionMode; set => SetProperty(ref _selectedProjectionMode, value); }
+    public SeamBlendingMode SelectedBlendingMode { get => _selectedBlendingMode; set => SetProperty(ref _selectedBlendingMode, value); }
+    public float StitchOverlapRatio { get => _stitchOverlapRatio; set => SetProperty(ref _stitchOverlapRatio, value); }
+    public bool EnableStitchGainCompensation { get => _enableStitchGainCompensation; set => SetProperty(ref _enableStitchGainCompensation, value); }
+    public float StitchFeatherRadius { get => _stitchFeatherRadius; set => SetProperty(ref _stitchFeatherRadius, value); }
     public float DehazeStrength { get => _dehazeStrength; set => SetProperty(ref _dehazeStrength, value); }
     public float DeconvolutionRadius { get => _deconvolutionRadius; set => SetProperty(ref _deconvolutionRadius, value); }
     public int DeconvolutionIterations { get => _deconvolutionIterations; set => SetProperty(ref _deconvolutionIterations, value); }
@@ -1812,6 +1826,24 @@ public sealed class MainViewModel : ViewModelBase
                     Benchmark = new BenchmarkReport { Width = dRes.SuperResolvedImage.Width, Height = dRes.SuperResolvedImage.Height, FrameCount = activeFiles.Count }
                 };
                 StatusMessage = $"HST Drizzle Super-Resolution Complete! Upscaled {dRes.EffectiveScale:F1}x.";
+            }
+            else if (SelectedStackType == StackType.MosaicStitch)
+            {
+                var sSettings = new StitchSettings
+                {
+                    ProjectionMode = SelectedProjectionMode,
+                    BlendingMode = SelectedBlendingMode,
+                    SearchOverlapRatio = StitchOverlapRatio,
+                    EnableGainCompensation = EnableStitchGainCompensation,
+                    FeatherRadiusPercentage = StitchFeatherRadius
+                };
+                using var sRes = await _stackService.ProcessMosaicStitchAsync(activeFiles, sSettings, progress, _cts.Token);
+                _lastResult = new ProcessedStackResult(sRes.CanvasWidth, sRes.CanvasHeight)
+                {
+                    FusedImage = sRes.StitchedImage.Clone(),
+                    Benchmark = new BenchmarkReport { Width = sRes.CanvasWidth, Height = sRes.CanvasHeight, FrameCount = activeFiles.Count }
+                };
+                StatusMessage = $"Mosaic Stitching Complete! Assembled {sRes.TilesMerged} tiles into expanded {sRes.CanvasWidth}x{sRes.CanvasHeight} canvas.";
             }
             else
             {

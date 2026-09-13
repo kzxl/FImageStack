@@ -575,6 +575,7 @@
                                             <ComboBoxItem Content="🌈 Pure HDR Dynamic Range Stacking" Tag="{x:Static core:StackType.HdrStack}" />
                                             <ComboBoxItem Content="🌌 Astro Deep-Sky Stacking &amp; Alignment" Tag="{x:Static core:StackType.AstroStack}" />
                                             <ComboBoxItem Content="🔭 HST Subpixel Drizzle Super-Resolution" Tag="{x:Static core:StackType.SuperResolution}" />
+                                            <ComboBoxItem Content="🗺️ Matrix Mosaic &amp; Panorama Stitching" Tag="{x:Static core:StackType.MosaicStitch}" />
                                         </ComboBox>
 
                                     </StackPanel>
@@ -624,6 +625,32 @@
                                                 <TextBlock Text="{Binding DrizzlePixFrac, StringFormat='{}{0:F2}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11" />
                                             </Grid>
                                             <Slider Minimum="0.2" Maximum="1.0" Value="{Binding DrizzlePixFrac}" SmallChange="0.05" Margin="0,0,0,6" />
+                                        </StackPanel>
+
+                                        <!-- Mosaic Stitching Parameters -->
+                                        <StackPanel Margin="0,0,0,6">
+                                            <TextBlock Text="Stitch Projection Geometry:" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2" />
+                                            <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedProjectionMode}" Margin="0,0,0,6">
+                                                <ComboBoxItem Content="Planar / Flat (Macro Matrix)" Tag="{x:Static core:StitchProjectionMode.Planar}" IsSelected="True" />
+                                                <ComboBoxItem Content="Cylindrical (Wide Horizontal)" Tag="{x:Static core:StitchProjectionMode.Cylindrical}" />
+                                                <ComboBoxItem Content="Spherical (360 Equirectangular)" Tag="{x:Static core:StitchProjectionMode.Spherical}" />
+                                            </ComboBox>
+
+                                            <TextBlock Text="Seam Blending Method:" Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2" />
+                                            <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedBlendingMode}" Margin="0,0,0,6">
+                                                <ComboBoxItem Content="Linear Distance Feathering" Tag="{x:Static core:SeamBlendingMode.LinearFeathering}" IsSelected="True" />
+                                                <ComboBoxItem Content="Multi-Band Laplacian" Tag="{x:Static core:SeamBlendingMode.MultiBandLaplacian}" />
+                                                <ComboBoxItem Content="Max Sharpness Weighted" Tag="{x:Static core:SeamBlendingMode.MaxSharpnessWeighted}" />
+                                                <ComboBoxItem Content="Hard Seam (No Feather)" Tag="{x:Static core:SeamBlendingMode.None}" />
+                                            </ComboBox>
+
+                                            <Grid Margin="0,0,0,1">
+                                                <TextBlock Text="Expected Overlap Ratio:" Foreground="{StaticResource TextSecondary}" FontSize="11" />
+                                                <TextBlock Text="{Binding StitchOverlapRatio, StringFormat='{}{0:P0}'}" Foreground="{StaticResource TextPrimary}" HorizontalAlignment="Right" FontWeight="SemiBold" FontSize="11" />
+                                            </Grid>
+                                            <Slider Minimum="0.10" Maximum="0.60" Value="{Binding StitchOverlapRatio}" SmallChange="0.05" Margin="0,0,0,6" />
+
+                                            <CheckBox Content="Exposure Gain Compensation" IsChecked="{Binding EnableStitchGainCompensation}" FontSize="11" Margin="0,0,0,4" />
                                         </StackPanel>
                                     </StackPanel>
                                 </Border>

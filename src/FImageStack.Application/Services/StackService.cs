@@ -18,6 +18,7 @@ using FImageStack.Core.Reconstruction;
 using FImageStack.Core.Restoration;
 using FImageStack.Core.SuperResolution;
 using FImageStack.Core.SuperResolution.Drizzle;
+using FImageStack.Core.Stitching;
 using FImageStack.Core.Tiling;
 using FImageStack.Infrastructure.IO;
 using StackFrame = FImageStack.Core.Models.StackFrame;
@@ -73,6 +74,12 @@ public interface IStackService
         IProgress<StackProgress>? progress = null,
         CancellationToken cancellationToken = default);
 
+    Task<StitchResult> ProcessMosaicStitchAsync(
+        IReadOnlyList<string> filePaths,
+        StitchSettings settings,
+        IProgress<StackProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+
     Task<ImageBuffer<float>> DeconvolveImageAsync(
         ImageBuffer<float> input,
         DeconvolutionOptions options);
@@ -113,6 +120,7 @@ public sealed class StackService : IStackService
     private readonly IBayerFusionEngine _bayerFusionEngine;
     private readonly IDemosaicEngine _demosaicEngine;
     private readonly IDrizzleEngine _drizzleEngine;
+    private readonly IMosaicStitchEngine _mosaicStitchEngine;
     private readonly IGpuAccelerationEngine _gpuEngine;
 
     public StackService(
@@ -139,6 +147,7 @@ public sealed class StackService : IStackService
         IBayerFusionEngine? bayerFusionEngine = null,
         IDemosaicEngine? demosaicEngine = null,
         IDrizzleEngine? drizzleEngine = null,
+        IMosaicStitchEngine? mosaicStitchEngine = null,
         IGpuAccelerationEngine? gpuEngine = null)
     {
         _imageIO = imageIO;
@@ -164,6 +173,7 @@ public sealed class StackService : IStackService
         _bayerFusionEngine = bayerFusionEngine ?? new BayerFusionEngine();
         _demosaicEngine = demosaicEngine ?? new EdgeDirectedDemosaicEngine();
         _drizzleEngine = drizzleEngine ?? new DrizzleEngine();
+        _mosaicStitchEngine = mosaicStitchEngine ?? new MosaicStitchEngine();
         _gpuEngine = gpuEngine ?? new StandardGpuAccelerationEngine();
     }
 
@@ -833,6 +843,41 @@ public sealed class StackService : IStackService
         });
 
         return dst;
+    }
+
+    public async Task<StitchResult> ProcessMosaicStitchAsync(
+        IReadOnlyList<string> filePaths,
+        StitchSettings settings,
+        IProgress<StackProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        if (filePaths == null || filePaths.Count == 0)
+            throw new ArgumentException("Frames list cannot be empty for Mosaic Stitching.", nameof(filePaths));
+
+        progress?.Report(new StackProgress("Loading Frames", 0, $"Loading {filePaths.Count} tiles for Mosaic Stitching..."));
+        var frames = new List<StackFrame>(filePaths.Count);
+
+        for (int i = 0; i < filePaths.Count; i++)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var frame = await Task.Run(() => _imageIO.LoadFrame(filePaths[i], i), cancellationToken);
+            frames.Add(frame);
+            progress?.Report(new StackProgress("Loading Frames", (double)(i + 1) / filePaths.Count * 100, $"Loaded {Path.GetFileName(filePaths[i])}"));
+        }
+
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await Task.Run(() => _mosaicStitchEngine.Stitch(frames, settings, progress), cancellationToken);
+            return result;
+        }
+        finally
+        {
+            foreach (var frame in frames)
+            {
+                frame.Dispose();
+            }
+        }
     }
 }
 

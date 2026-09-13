@@ -107,7 +107,8 @@ public enum StackType
     NoiseStack,
     AstroStack,
     SuperResolution,
-    Restoration
+    Restoration,
+    MosaicStitch
 }
 
 public enum NoiseStackMethod
@@ -132,5 +133,20 @@ public enum MeshExportFormat
     PlyPointCloud,
     ObjSurfaceMesh,
     NormalMapPng
+}
+
+public enum StitchProjectionMode
+{
+    Planar,
+    Cylindrical,
+    Spherical
+}
+
+public enum SeamBlendingMode
+{
+    LinearFeathering,
+    MultiBandLaplacian,
+    MaxSharpnessWeighted,
+    None
 }
 
