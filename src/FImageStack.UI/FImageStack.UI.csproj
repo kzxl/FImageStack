@@ -16,4 +16,7 @@
     <ProjectReference Include="..\FImageStack.Application\FImageStack.Application.csproj" />
     <ProjectReference Include="..\FImageStack.Infrastructure.ZeroGraphics\FImageStack.Infrastructure.ZeroGraphics.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="ZeroUI.Wpf" Version="1.5.0" />
+  </ItemGroup>
 </Project>

@@ -5,6 +5,10 @@
         xmlns:core="clr-namespace:FImageStack.Core;assembly=FImageStack.Core"
         xmlns:retouch="clr-namespace:FImageStack.Core.Retouch;assembly=FImageStack.Core"
         xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+        xmlns:zero="clr-namespace:ZeroUI.Wpf.Theme;assembly=ZeroUI.Wpf"
+        xmlns:opt="clr-namespace:ZeroUI.Wpf.Rendering.Optimizer;assembly=ZeroUI.Wpf"
+        xmlns:feedback="clr-namespace:ZeroUI.Wpf.Feedback;assembly=ZeroUI.Wpf"
+        xmlns:editors="clr-namespace:ZeroUI.Wpf.Editors;assembly=ZeroUI.Wpf"
         Title="FImageStack Pro — Intelligent Focus Fusion Engine"
         Height="950" Width="1480"
         MinHeight="700" MinWidth="1100"
@@ -30,7 +34,7 @@
         </Grid.RowDefinitions>
 
         <!-- 1. Top Header Bar -->
-        <Border Grid.Row="0" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="16,10">
+        <Border Grid.Row="0" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="16,10" opt:RenderOptimizer.Elevation="2">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto" />
@@ -86,7 +90,7 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <Border Grid.Row="0" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="12,8">
+                    <Border Grid.Row="0" Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,0,0,1" Padding="12,8" opt:RenderOptimizer.Elevation="1">
                         <Grid>
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
@@ -282,10 +286,8 @@
                     <!-- Floating Zoom Controls HUD Toolbar (Top-Right) -->
                     <Border HorizontalAlignment="Right" VerticalAlignment="Top" Margin="16"
                             Background="#DD0F172A" BorderBrush="{StaticResource BorderHover}" BorderThickness="1"
-                            CornerRadius="8" Padding="6,4">
-                        <Border.Effect>
-                            <DropShadowEffect BlurRadius="8" ShadowDepth="2" Opacity="0.5" Color="#000000" />
-                        </Border.Effect>
+                            CornerRadius="8" Padding="6,4"
+                            opt:RenderOptimizer.Elevation="3">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <Button Content="➖" Style="{StaticResource ModernButton}" Command="{Binding ZoomOutCommand}" Padding="6,3" FontSize="11" ToolTip="Zoom Out (Ctrl + Wheel Down)" Margin="0,0,3,0" />
                             <Border Background="#1E293B" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="4" Padding="8,3" Margin="0,0,3,0" VerticalAlignment="Center">
@@ -400,6 +402,7 @@
                     <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="16"
                             Background="#DD161926" BorderBrush="{StaticResource BorderHover}" BorderThickness="1"
                             CornerRadius="8" Padding="12,8"
+                            opt:RenderOptimizer.Elevation="3"
                             Visibility="{Binding InspectorInfo, Converter={StaticResource BoolToVis}}">
                         <StackPanel Orientation="Vertical">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -467,7 +470,7 @@
                             <!-- Tab 0: Stacking Engine & Presets -->
                             <StackPanel Visibility="{Binding IsSidebarStackTabSelected, Converter={StaticResource BoolToVis}}">
                                 <!-- 1. Preset Profile Card -->
-                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10" opt:RenderOptimizer.Elevation="1">
                                     <StackPanel>
                                         <TextBlock Text="🎯 PRESET PROFILE" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,6" />
                                         <ComboBox ItemsSource="{Binding AvailablePresets}" SelectedItem="{Binding SelectedPreset}" DisplayMemberPath="Name" Margin="0,0,0,4" />
@@ -476,7 +479,7 @@
                                 </Border>
 
                                 <!-- 2. Strategy Card -->
-                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10" opt:RenderOptimizer.Elevation="1">
                                     <StackPanel>
                                         <TextBlock Text="⚙️ FUSION STRATEGY" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,8" />
 
@@ -515,7 +518,7 @@
                                 </Border>
 
                                 <!-- 3. Intelligent Diagnostics Card -->
-                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10" opt:RenderOptimizer.Elevation="1">
                                     <StackPanel>
                                         <TextBlock Text="🧠 INTELLIGENT DIAGNOSTICS" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,6" />
 
@@ -539,7 +542,7 @@
                                 </Border>
 
                                 <!-- 4. Hardware & GPU Acceleration Card -->
-                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6" opt:RenderOptimizer.Elevation="1">
                                     <StackPanel>
                                         <Grid Margin="0,0,0,6">
                                             <TextBlock Text="⚡ HARDWARE ACCELERATION" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
@@ -563,7 +566,7 @@
                             <!-- Tab 1: Computational Imaging Modes & Tools -->
                             <StackPanel Visibility="{Binding IsSidebarModesTabSelected, Converter={StaticResource BoolToVis}}">
                                 <!-- 1. Computational Photography Mode Selector -->
-                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10" opt:RenderOptimizer.Elevation="1">
                                     <StackPanel>
                                         <TextBlock Text="🔬 COMPUTATIONAL PHOTOGRAPHY MODE" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,6" />
                                         <ComboBox SelectedValuePath="Tag" SelectedValue="{Binding SelectedStackType}" Margin="0,0,0,6">
@@ -578,7 +581,7 @@
                                 </Border>
 
                                 <!-- 2. Dedicated Parameters Card -->
-                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10" opt:RenderOptimizer.Elevation="1">
                                     <StackPanel>
                                         <TextBlock Text="⚙️ MODE PARAMETERS" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,8" />
 
@@ -626,7 +629,7 @@
                                 </Border>
 
                                 <!-- 3. Optical Restoration & 3D Export Card -->
-                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6" opt:RenderOptimizer.Elevation="1">
                                     <StackPanel>
                                         <TextBlock Text="🌌 RESTORATION &amp; 3D EXPORT" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,8" />
                                         
@@ -644,7 +647,7 @@
                             <StackPanel Visibility="{Binding IsSidebarColorTabSelected, Converter={StaticResource BoolToVis}}">
 
                                 <!-- 1. Live Dynamic Histogram Card -->
-                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10" opt:RenderOptimizer.Elevation="1">
                                     <StackPanel>
                                         <TextBlock Text="📈 LUMINANCE HISTOGRAM" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" Margin="0,0,0,6" />
                                         <Border Background="#0A0C14" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="4" Height="75" ClipToBounds="True" Margin="0,0,0,6">
@@ -658,7 +661,7 @@
                                 </Border>
 
                                 <!-- 2. Post-Processing & Clarity Card -->
-                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6" opt:RenderOptimizer.Elevation="1">
                                     <StackPanel>
                                         <Grid Margin="0,0,0,6">
                                             <TextBlock Text="🎨 POST-PROCESSING &amp; CLARITY" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
@@ -708,7 +711,7 @@
 
                             <!-- Tab 2: Retouch & Manual Focus Override -->
                             <StackPanel Visibility="{Binding IsSidebarRetouchTabSelected, Converter={StaticResource BoolToVis}}">
-                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderHover}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderHover}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6" opt:RenderOptimizer.Elevation="1">
                                     <StackPanel>
                                         <Grid Margin="0,0,0,8">
                                             <TextBlock Text="🖌️ RETOUCH &amp; MANUAL OVERRIDE" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
@@ -766,7 +769,7 @@
                             <!-- Tab 3: Quality Metrics & Artifact Navigator -->
                             <StackPanel Visibility="{Binding IsSidebarMetricsTabSelected, Converter={StaticResource BoolToVis}}">
                                 <!-- 1. Advanced Quality Analyzer Card -->
-                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10" opt:RenderOptimizer.Elevation="1">
                                     <StackPanel>
                                         <Grid Margin="0,0,0,8">
                                             <TextBlock Text="📊 QUALITY ANALYZER" FontWeight="Bold" FontSize="11" Foreground="{StaticResource PrimaryAccent}" VerticalAlignment="Center" />
@@ -807,7 +810,7 @@
                                 </Border>
 
                                 <!-- 2. Interactive Detected Artifacts Navigator -->
-                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,10" opt:RenderOptimizer.Elevation="1">
                                     <StackPanel>
                                         <TextBlock Text="🚨 DETECTED ARTIFACT REGIONS" FontWeight="Bold" FontSize="11" Foreground="{StaticResource WarningAccent}" Margin="0,0,0,6" />
                                         <ItemsControl ItemsSource="{Binding DetectedArtifactRegions}">
@@ -832,7 +835,7 @@
                                 </Border>
 
                                 <!-- 3. Speed & RAM Info Card -->
-                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6">
+                                <Border Background="{StaticResource BgCard}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="1" CornerRadius="8" Padding="12" Margin="0,0,0,6" opt:RenderOptimizer.Elevation="1">
                                     <Grid>
                                         <TextBlock Text="{Binding TimingText, StringFormat='Speed: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" />
                                         <TextBlock Text="{Binding MemoryUsageText, StringFormat='RAM: {0}'}" Foreground="{StaticResource TextMuted}" FontSize="11" HorizontalAlignment="Right" />
@@ -843,7 +846,7 @@
                     </ScrollViewer>
 
                     <!-- 3. Bottom Pinned Sticky Action Dock (Always Visible) -->
-                    <Border Grid.Row="2" Background="#121524" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,1,0,0" Padding="12,10">
+                    <Border Grid.Row="2" Background="#121524" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,1,0,0" Padding="12,10" opt:RenderOptimizer.Elevation="3">
                         <StackPanel>
                             <!-- Dual-Action Preview & Master Render Buttons -->
                             <Grid Margin="0,0,0,6">
@@ -870,7 +873,7 @@
         </Grid>
 
         <!-- 3. Bottom Status Bar -->
-        <Border Grid.Row="2" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,1,0,0" Padding="16,8">
+        <Border Grid.Row="2" Background="{StaticResource BgPanel}" BorderBrush="{StaticResource BorderDefault}" BorderThickness="0,1,0,0" Padding="16,8" opt:RenderOptimizer.Elevation="2">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
@@ -890,7 +893,7 @@
 
         <!-- 4. Artifact Hunter Diagnostic Popup Modal Overlay -->
         <Grid Grid.Row="0" Grid.RowSpan="3" Background="#AA030712" Visibility="{Binding IsHunterPopupOpen, Converter={StaticResource BoolToVis}}">
-            <Border Width="680" Background="#0F172A" BorderBrush="#A855F7" BorderThickness="2" CornerRadius="12" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+            <Border Width="680" Background="#0F172A" BorderBrush="#A855F7" BorderThickness="2" CornerRadius="12" Padding="20" HorizontalAlignment="Center" VerticalAlignment="Center" opt:RenderOptimizer.Elevation="4">
                 <StackPanel>
                     <Grid Margin="0,0,0,12">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
