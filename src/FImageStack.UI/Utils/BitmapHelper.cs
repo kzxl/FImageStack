@@ -423,15 +423,82 @@ public static class BitmapHelper
         return wb;
     }
 
-    public static BitmapImage LoadThumbnail(string filePath, int decodeWidth = 120)
+    private static readonly HashSet<string> RawExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        var bitmap = new BitmapImage();
-        bitmap.BeginInit();
-        bitmap.UriSource = new Uri(filePath, UriKind.Absolute);
-        bitmap.DecodePixelWidth = decodeWidth;
-        bitmap.CacheOption = BitmapCacheOption.OnLoad;
-        bitmap.EndInit();
-        bitmap.Freeze();
-        return bitmap;
+        ".cr2", ".cr3", ".nef", ".arw", ".dng", ".orf", ".raf", ".rw2", ".pef"
+    };
+
+    public static BitmapSource? LoadThumbnail(string filePath, int decodeWidth = 120)
+    {
+        if (!File.Exists(filePath)) return null;
+
+        string ext = Path.GetExtension(filePath);
+        if (RawExtensions.Contains(ext))
+        {
+            try
+            {
+                var rawEngine = new FImageStack.Infrastructure.IO.RawDecoderEngine();
+                using var stream = rawEngine.OpenEmbeddedJpegStream(filePath);
+                if (stream != null)
+                {
+                    var bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.StreamSource = stream;
+                    bitmap.DecodePixelWidth = decodeWidth;
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.EndInit();
+                    bitmap.Freeze();
+                    return bitmap;
+                }
+            }
+            catch
+            {
+                // Fall through to standard loading or placeholder
+            }
+        }
+
+        try
+        {
+            var bitmap = new BitmapImage();
+            bitmap.BeginInit();
+            bitmap.UriSource = new Uri(filePath, UriKind.Absolute);
+            bitmap.DecodePixelWidth = decodeWidth;
+            bitmap.CacheOption = BitmapCacheOption.OnLoad;
+            bitmap.EndInit();
+            bitmap.Freeze();
+            return bitmap;
+        }
+        catch
+        {
+            return CreatePlaceholderThumbnail(decodeWidth, Math.Max(2, (int)(decodeWidth * 2.0 / 3.0)));
+        }
+    }
+
+    private static unsafe BitmapSource CreatePlaceholderThumbnail(int width, int height)
+    {
+        var wb = new WriteableBitmap(width, height, 96, 96, PixelFormats.Bgr32, null);
+        wb.Lock();
+        byte* backBuffer = (byte*)wb.BackBuffer;
+        int stride = wb.BackBufferStride;
+
+        for (int y = 0; y < height; y++)
+        {
+            byte* row = backBuffer + y * stride;
+            for (int x = 0; x < width; x++)
+            {
+                int idx = x * 4;
+                bool isBorder = (x == 0 || y == 0 || x == width - 1 || y == height - 1);
+                byte c = isBorder ? (byte)80 : (byte)32;
+                row[idx] = c;     // B
+                row[idx + 1] = c; // G
+                row[idx + 2] = c; // R
+                row[idx + 3] = 255;
+            }
+        }
+
+        wb.AddDirtyRect(new System.Windows.Int32Rect(0, 0, width, height));
+        wb.Unlock();
+        wb.Freeze();
+        return wb;
     }
 }

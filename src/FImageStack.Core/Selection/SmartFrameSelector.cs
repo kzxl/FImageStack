@@ -31,8 +31,6 @@ public sealed class SmartFrameSelector : ISmartFrameSelector
         if (frames == null || frames.Count == 0) return diagnostics;
 
         int count = frames.Count;
-        int width = frames[0].Width;
-        int height = frames[0].Height;
 
         // Step 1: Calculate individual frame metrics (Sharpness & Exposure)
         double[] sharpnessArray = new double[count];
@@ -41,18 +39,22 @@ public sealed class SmartFrameSelector : ISmartFrameSelector
         for (int i = 0; i < count; i++)
         {
             var f = frames[i];
+            int width = f.GrayBuffer != null ? f.GrayBuffer.Width : f.Width;
+            int height = f.GrayBuffer != null ? f.GrayBuffer.Height : f.Height;
             float* gray = f.GrayBuffer != null ? f.GrayBuffer.DataPointer : null;
 
             double sumLum = 0;
             double sumGrad = 0;
             int highClip = 0;
             int shadowClip = 0;
+            int sampledPixels = 0;
 
-            if (gray != null)
+            if (gray != null && width > 2 && height > 2)
             {
                 for (int y = 1; y < height - 1; y += 2) // Step 2 sampling for fast analysis
                 {
                     int row = y * width;
+                    int prevRow = (y - 1) * width;
                     int nextRow = (y + 1) * width;
 
                     for (int x = 1; x < width - 1; x += 2)
@@ -65,15 +67,16 @@ public sealed class SmartFrameSelector : ISmartFrameSelector
 
                         // Fast gradient magnitude
                         float gx = gray[row + x + 1] - gray[row + x - 1];
-                        float gy = gray[nextRow + x] - gray[row - width + x];
+                        float gy = gray[nextRow + x] - gray[prevRow + x];
                         sumGrad += MathF.Abs(gx) + MathF.Abs(gy);
+                        sampledPixels++;
                     }
                 }
             }
 
-            int sampledPixels = (width / 2) * (height / 2);
-            double meanLum = sumLum / sampledPixels;
-            double rawSharp = sumGrad / sampledPixels * 100.0;
+            int validSampled = Math.Max(1, sampledPixels);
+            double meanLum = sumLum / validSampled;
+            double rawSharp = sumGrad / validSampled * 100.0;
 
             sharpnessArray[i] = rawSharp;
             exposureArray[i] = meanLum;
@@ -82,8 +85,8 @@ public sealed class SmartFrameSelector : ISmartFrameSelector
             {
                 FrameIndex = i,
                 ExposureMean = meanLum,
-                HighlightClipPercent = (double)highClip / sampledPixels * 100.0,
-                ShadowClipPercent = (double)shadowClip / sampledPixels * 100.0,
+                HighlightClipPercent = (double)highClip / validSampled * 100.0,
+                ShadowClipPercent = (double)shadowClip / validSampled * 100.0,
                 SharpnessScore = rawSharp
             });
         }

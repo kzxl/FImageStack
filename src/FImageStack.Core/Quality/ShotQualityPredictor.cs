@@ -23,19 +23,30 @@ public sealed class ShotQualityPredictor : IShotQualityPredictor
         int h = frames[0].Height;
         int totalPixels = w * h;
 
+        int minPixels = totalPixels;
+        for (int k = 0; k < frameCount; k++)
+        {
+            if (frames[k].FocusMap != null)
+            {
+                int p = frames[k].FocusMap!.TotalElements;
+                if (p < minPixels) minPixels = p;
+            }
+        }
+
         // 1. Calculate Expected Sharpness
         float sumSharpness = 0f;
         int sampledPixels = 0;
-        int step = Math.Max(1, totalPixels / 500);
+        int step = Math.Max(1, minPixels / 500);
 
-        for (int i = 0; i < totalPixels; i += step)
+        for (int i = 0; i < minPixels; i += step)
         {
             float maxFocus = 0f;
             for (int k = 0; k < frameCount; k++)
             {
-                if (frames[k].FocusMap != null)
+                var fm = frames[k].FocusMap;
+                if (fm != null && i < fm.TotalElements)
                 {
-                    float val = frames[k].FocusMap!.DataPointer[i];
+                    float val = fm.DataPointer[i];
                     if (val > maxFocus) maxFocus = val;
                 }
             }
@@ -72,8 +83,10 @@ public sealed class ShotQualityPredictor : IShotQualityPredictor
                 float unionSum = 0f;
                 float* p0 = f0.FocusMap.DataPointer;
                 float* p1 = f1.FocusMap.DataPointer;
+                int pairPixels = Math.Min(f0.FocusMap.TotalElements, f1.FocusMap.TotalElements);
+                int pairStep = Math.Max(1, pairPixels / 500);
 
-                for (int i = 0; i < totalPixels; i += step)
+                for (int i = 0; i < pairPixels; i += pairStep)
                 {
                     float a = p0[i];
                     float b = p1[i];

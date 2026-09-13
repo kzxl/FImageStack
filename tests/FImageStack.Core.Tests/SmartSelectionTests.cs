@@ -1,5 +1,6 @@
 using FImageStack.Core;
 using FImageStack.Core.Models;
+using FImageStack.Core.Quality;
 using FImageStack.Core.Selection;
 using Xunit;
 
@@ -87,5 +88,52 @@ public class SmartSelectionTests
         Assert.True(diags[2].IsExposureAnomaly, "Frame 2 should be flagged as exposure anomaly");
 
         foreach (var f in frames) f.Dispose();
+    }
+
+    [Fact]
+    public void SmartFrameSelector_WithHeterogeneousDimensions_ShouldNotCrash()
+    {
+        // Simulate a mixed folder: Frame 0 is square (128x128), Frame 1 is 3:2 (128x85), Frame 2 is 16:9 (128x72)
+        var frames = new List<StackFrame>
+        {
+            new StackFrame { Index = 0, Width = 128, Height = 128, GrayBuffer = new ImageBuffer<float>(128, 128, 1) },
+            new StackFrame { Index = 1, Width = 128, Height = 85, GrayBuffer = new ImageBuffer<float>(128, 85, 1) },
+            new StackFrame { Index = 2, Width = 128, Height = 72, GrayBuffer = new ImageBuffer<float>(128, 72, 1) }
+        };
+
+        // Fill with arbitrary values
+        frames[0].GrayBuffer!.AsSpan().Fill(0.5f);
+        frames[1].GrayBuffer!.AsSpan().Fill(0.6f);
+        frames[2].GrayBuffer!.AsSpan().Fill(0.4f);
+
+        var selector = new SmartFrameSelector();
+        var diags = selector.AnalyzeStack(frames);
+
+        Assert.Equal(3, diags.Count);
+        Assert.NotNull(diags[0]);
+        Assert.NotNull(diags[1]);
+        Assert.NotNull(diags[2]);
+
+        // Quality Predictor with heterogeneous frames
+        var predictor = new ShotQualityPredictor();
+        var scorecard = predictor.PredictQuality(frames);
+        Assert.NotNull(scorecard);
+
+        // Focus Wave Engine with heterogeneous frames
+        var waveEngine = new FocusWaveEngine();
+        var waveResult = waveEngine.AnalyzeFocusWave(frames);
+        Assert.NotNull(waveResult);
+        Assert.Equal(3, waveResult.TotalFrames);
+
+        foreach (var f in frames) f.Dispose();
+    }
+
+    [Fact]
+    public void ImageBuffer_MemoryPressureTracking_ShouldSucceed()
+    {
+        // Allocate and dispose buffer to ensure GC memory pressure doesn't throw
+        var buffer = new ImageBuffer<float>(256, 256, 3);
+        Assert.True(buffer.ByteSize > 0);
+        buffer.Dispose();
     }
 }

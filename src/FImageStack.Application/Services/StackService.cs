@@ -212,10 +212,26 @@ public sealed class StackService : IStackService
         if (frames.Count < 2)
             throw new InvalidOperationException("At least 2 readable image frames are required to perform focus stacking.");
 
+        int targetW = frames[0].Width;
+        int targetH = frames[0].Height;
+        if (frames.Any(f => f.Width != targetW || f.Height != targetH))
+        {
+            progress?.Report(new StackProgress("Normalizing Frames", 0, "Resampling heterogeneous frame resolutions..."));
+            for (int i = 0; i < frames.Count; i++)
+            {
+                var f = frames[i];
+                if (f.Width != targetW || f.Height != targetH)
+                {
+                    NormalizeFrameResolution(f, targetW, targetH);
+                }
+            }
+            progress?.Report(new StackProgress("Normalizing Frames", 100, $"All frames normalized to {targetW}x{targetH}"));
+        }
+
         sw.Stop();
         benchmark.LoadTimeMs = sw.Elapsed.TotalMilliseconds;
-        benchmark.Width = frames[0].Width;
-        benchmark.Height = frames[0].Height;
+        benchmark.Width = targetW;
+        benchmark.Height = targetH;
 
         try
         {
@@ -745,6 +761,78 @@ public sealed class StackService : IStackService
                 frame.Dispose();
             }
         }
+    }
+
+    private static void NormalizeFrameResolution(StackFrame frame, int targetW, int targetH)
+    {
+        if (frame.Width == targetW && frame.Height == targetH) return;
+
+        if (frame.ColorBuffer != null)
+        {
+            var newColor = ResampleBilinear(frame.ColorBuffer, targetW, targetH);
+            frame.ColorBuffer.Dispose();
+            frame.ColorBuffer = newColor;
+        }
+
+        if (frame.GrayBuffer != null)
+        {
+            var newGray = ResampleBilinear(frame.GrayBuffer, targetW, targetH);
+            frame.GrayBuffer.Dispose();
+            frame.GrayBuffer = newGray;
+        }
+
+        frame.Width = targetW;
+        frame.Height = targetH;
+    }
+
+    private static ImageBuffer<float> ResampleBilinear(ImageBuffer<float> src, int dstW, int dstH)
+    {
+        int srcW = src.Width;
+        int srcH = src.Height;
+        int channels = src.Channels;
+        var dst = new ImageBuffer<float>(dstW, dstH, channels, src.Format);
+
+        float scaleX = (float)srcW / dstW;
+        float scaleY = (float)srcH / dstH;
+
+        Parallel.For(0, dstH, y =>
+        {
+            float srcY = (y + 0.5f) * scaleY - 0.5f;
+            int y0 = Math.Clamp((int)MathF.Floor(srcY), 0, srcH - 1);
+            int y1 = Math.Clamp(y0 + 1, 0, srcH - 1);
+            float fy = Math.Clamp(srcY - y0, 0f, 1f);
+
+            var row0 = src.GetRowSpan(y0);
+            var row1 = src.GetRowSpan(y1);
+            var dstRow = dst.GetRowSpan(y);
+
+            for (int x = 0; x < dstW; x++)
+            {
+                float srcX = (x + 0.5f) * scaleX - 0.5f;
+                int x0 = Math.Clamp((int)MathF.Floor(srcX), 0, srcW - 1);
+                int x1 = Math.Clamp(x0 + 1, 0, srcW - 1);
+                float fx = Math.Clamp(srcX - x0, 0f, 1f);
+
+                int dIdx = x * channels;
+                int sIdx0 = x0 * channels;
+                int sIdx1 = x1 * channels;
+
+                for (int c = 0; c < channels; c++)
+                {
+                    float c00 = row0[sIdx0 + c];
+                    float c10 = row0[sIdx1 + c];
+                    float c01 = row1[sIdx0 + c];
+                    float c11 = row1[sIdx1 + c];
+
+                    float top = c00 + fx * (c10 - c00);
+                    float bottom = c01 + fx * (c11 - c01);
+
+                    dstRow[dIdx + c] = top + fy * (bottom - top);
+                }
+            }
+        });
+
+        return dst;
     }
 }
 

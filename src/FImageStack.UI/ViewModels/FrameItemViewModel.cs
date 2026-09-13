@@ -8,7 +8,7 @@ namespace FImageStack.UI.ViewModels;
 public sealed class FrameItemViewModel : ViewModelBase
 {
     private bool _isSelected = true;
-    private BitmapImage? _thumbnail;
+    private BitmapSource? _thumbnail;
     private double _sharpnessScore = 100.0;
     private bool _isExcluded;
     private float _priorityWeight = 1.0f;
@@ -87,7 +87,7 @@ public sealed class FrameItemViewModel : ViewModelBase
     public string StatusBorderColorHex => IsBadFrame ? "#EF4444" : (IsDuplicate ? "#F59E0B" : "Transparent");
     public string StatusBackgroundColorHex => IsBadFrame ? "#261318" : (IsDuplicate ? "#262013" : "Transparent");
 
-    public BitmapImage? Thumbnail
+    public BitmapSource? Thumbnail
     {
         get
         {

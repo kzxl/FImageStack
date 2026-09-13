@@ -34,6 +34,7 @@ public unsafe sealed class ImageBuffer<T> : IDisposable where T : unmanaged
 
         nuint byteCount = (nuint)TotalElements * (nuint)sizeof(T);
         _pointer = (T*)NativeMemory.AllocZeroed(byteCount);
+        GC.AddMemoryPressure((long)byteCount);
     }
 
     public T* DataPointer
@@ -105,6 +106,7 @@ public unsafe sealed class ImageBuffer<T> : IDisposable where T : unmanaged
             {
                 NativeMemory.Free(_pointer);
                 _pointer = null;
+                GC.RemoveMemoryPressure(ByteSize);
             }
             _disposed = true;
         }

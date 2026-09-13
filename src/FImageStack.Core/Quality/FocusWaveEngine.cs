@@ -38,29 +38,32 @@ public sealed class FocusWaveEngine : IFocusWaveEngine
             var f = frames[k];
             float sumEnergy = 0f;
             float weightedDepthSum = 0f;
+            int fw = f.FocusMap != null ? f.FocusMap.Width : w;
+            int fh = f.FocusMap != null ? f.FocusMap.Height : h;
+            int fTotal = fw * fh;
 
             if (f.FocusMap != null)
             {
                 float* p = f.FocusMap.DataPointer;
-                for (int y = 0; y < h; y++)
+                for (int y = 0; y < fh; y++)
                 {
-                    int rowOffset = y * w;
-                    for (int x = 0; x < w; x++)
+                    int rowOffset = y * fw;
+                    for (int x = 0; x < fw; x++)
                     {
                         int idx = rowOffset + x;
                         float val = p[idx];
                         sumEnergy += val;
 
-                        float pixelZ = (depthResult != null)
+                        float pixelZ = (depthResult != null && x < depthResult.Width && y < depthResult.Height)
                             ? depthResult.DepthMap.At(x, y)
-                            : ((float)y / Math.Max(1, h - 1) * (frameCount - 1));
+                            : ((float)y / Math.Max(1, fh - 1) * (frameCount - 1));
 
                         weightedDepthSum += val * pixelZ;
                     }
                 }
             }
 
-            float energy = sumEnergy / totalPixels;
+            float energy = sumEnergy / Math.Max(1, fTotal);
             float continuousZ = (sumEnergy > 0) ? (weightedDepthSum / sumEnergy) : k * 1.0f;
             float deltaZ = (k > 0) ? (continuousZ - prevZ) : 1.0f;
             if (k > 0) stepDeltas.Add(MathF.Abs(deltaZ));

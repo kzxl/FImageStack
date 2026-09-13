@@ -9,7 +9,7 @@ namespace FImageStack.Infrastructure.IO;
 
 public interface IImageIO
 {
-    StackFrame LoadFrame(string filePath, int index, int maxDimension = 0);
+    StackFrame LoadFrame(string filePath, int index, int maxDimension = 0, bool grayOnly = false);
     void SaveImage(ImageBuffer<float> buffer, string outputPath, int bitDepth = 8);
 }
 
@@ -22,7 +22,7 @@ public sealed class ImageSharpIO : IImageIO
         _rawDecoder = rawDecoder ?? new RawDecoderEngine();
     }
 
-    public unsafe StackFrame LoadFrame(string filePath, int index, int maxDimension = 0)
+    public unsafe StackFrame LoadFrame(string filePath, int index, int maxDimension = 0, bool grayOnly = false)
     {
         if (!File.Exists(filePath))
             throw new FileNotFoundException("Image file not found.", filePath);
@@ -48,6 +48,12 @@ public sealed class ImageSharpIO : IImageIO
                 }
             });
 
+            if (grayOnly)
+            {
+                rawColor.Dispose();
+                rawColor = null;
+            }
+
             return new StackFrame
             {
                 Index = index,
@@ -55,7 +61,7 @@ public sealed class ImageSharpIO : IImageIO
                 Width = rw,
                 Height = rh,
                 BitDepth = 16,
-                Format = PixelFormatType.RgbFloat32,
+                Format = grayOnly ? PixelFormatType.GrayFloat32 : PixelFormatType.RgbFloat32,
                 ColorBuffer = rawColor,
                 GrayBuffer = rawGray
             };
@@ -76,10 +82,10 @@ public sealed class ImageSharpIO : IImageIO
         int width = image.Width;
         int height = image.Height;
 
-        var colorBuffer = new ImageBuffer<float>(width, height, 3, PixelFormatType.RgbFloat32);
+        var colorBuffer = grayOnly ? null : new ImageBuffer<float>(width, height, 3, PixelFormatType.RgbFloat32);
         var grayBuffer = new ImageBuffer<float>(width, height, 1, PixelFormatType.GrayFloat32);
 
-        float* cPtr = colorBuffer.DataPointer;
+        float* cPtr = colorBuffer != null ? colorBuffer.DataPointer : null;
         float* gPtr = grayBuffer.DataPointer;
 
         image.ProcessPixelRows(accessor =>
@@ -96,10 +102,13 @@ public sealed class ImageSharpIO : IImageIO
                     float g = pixel.G / 255f;
                     float b = pixel.B / 255f;
 
-                    int cIdx = (rowOffset + x) * 3;
-                    cPtr[cIdx] = r;
-                    cPtr[cIdx + 1] = g;
-                    cPtr[cIdx + 2] = b;
+                    if (cPtr != null)
+                    {
+                        int cIdx = (rowOffset + x) * 3;
+                        cPtr[cIdx] = r;
+                        cPtr[cIdx + 1] = g;
+                        cPtr[cIdx + 2] = b;
+                    }
 
                     // Standard Rec. 709 luminance weights
                     gPtr[rowOffset + x] = 0.2126f * r + 0.7152f * g + 0.0722f * b;
@@ -114,7 +123,7 @@ public sealed class ImageSharpIO : IImageIO
             Width = width,
             Height = height,
             BitDepth = 8,
-            Format = PixelFormatType.RgbFloat32,
+            Format = grayOnly ? PixelFormatType.GrayFloat32 : PixelFormatType.RgbFloat32,
             ColorBuffer = colorBuffer,
             GrayBuffer = grayBuffer
         };

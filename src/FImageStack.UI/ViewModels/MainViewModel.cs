@@ -1067,7 +1067,7 @@ public sealed class MainViewModel : ViewModelBase
                         {
                             try
                             {
-                                var f = _imageIO.LoadFrame(Frames[i].FilePath, i, maxDimension: 1280);
+                                var f = _imageIO.LoadFrame(Frames[i].FilePath, i, maxDimension: 1280, grayOnly: true);
                                 loadedFrames.Add(f);
                             }
                             catch (Exception ex)
@@ -2166,17 +2166,42 @@ public sealed class MainViewModel : ViewModelBase
         }
     }
 
-    private static BitmapImage? LoadBitmapImageSafe(string path)
+    private static BitmapSource? LoadBitmapImageSafe(string path)
     {
         try
         {
-            var bi = new BitmapImage();
-            bi.BeginInit();
-            bi.CacheOption = BitmapCacheOption.OnLoad;
-            bi.UriSource = new Uri(path, UriKind.Absolute);
-            bi.EndInit();
-            bi.Freeze();
-            return bi;
+            string ext = Path.GetExtension(path);
+            if (ext.Equals(".cr2", StringComparison.OrdinalIgnoreCase) ||
+                ext.Equals(".cr3", StringComparison.OrdinalIgnoreCase) ||
+                ext.Equals(".nef", StringComparison.OrdinalIgnoreCase) ||
+                ext.Equals(".arw", StringComparison.OrdinalIgnoreCase) ||
+                ext.Equals(".dng", StringComparison.OrdinalIgnoreCase) ||
+                ext.Equals(".orf", StringComparison.OrdinalIgnoreCase) ||
+                ext.Equals(".raf", StringComparison.OrdinalIgnoreCase) ||
+                ext.Equals(".rw2", StringComparison.OrdinalIgnoreCase) ||
+                ext.Equals(".pef", StringComparison.OrdinalIgnoreCase))
+            {
+                var rawEngine = new FImageStack.Infrastructure.IO.RawDecoderEngine();
+                using var stream = rawEngine.OpenEmbeddedJpegStream(path);
+                if (stream != null)
+                {
+                    var bi = new BitmapImage();
+                    bi.BeginInit();
+                    bi.CacheOption = BitmapCacheOption.OnLoad;
+                    bi.StreamSource = stream;
+                    bi.EndInit();
+                    bi.Freeze();
+                    return bi;
+                }
+            }
+
+            var stdBi = new BitmapImage();
+            stdBi.BeginInit();
+            stdBi.CacheOption = BitmapCacheOption.OnLoad;
+            stdBi.UriSource = new Uri(path, UriKind.Absolute);
+            stdBi.EndInit();
+            stdBi.Freeze();
+            return stdBi;
         }
         catch
         {

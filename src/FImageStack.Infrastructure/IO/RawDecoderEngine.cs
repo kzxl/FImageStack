@@ -1,5 +1,11 @@
+using System.Buffers;
+using System.IO;
+using System.Runtime.InteropServices;
 using FImageStack.Core;
 using FImageStack.Core.Models;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using SixLabors.ImageSharp.Processing;
 
 namespace FImageStack.Infrastructure.IO;
 
@@ -21,6 +27,7 @@ public interface IRawDecoderEngine
     bool IsRawFile(string filePath);
     ImageBuffer<float> DemosaicBayerCfa(ReadOnlySpan<ushort> cfaData, RawFrameMetadata metadata);
     ImageBuffer<float> LoadRawImage(string filePath, int maxDimension = 0);
+    Stream? OpenEmbeddedJpegStream(string filePath);
 }
 
 public sealed class RawDecoderEngine : IRawDecoderEngine
@@ -145,22 +152,163 @@ public sealed class RawDecoderEngine : IRawDecoderEngine
         return output;
     }
 
-    public ImageBuffer<float> LoadRawImage(string filePath, int maxDimension = 0)
+    public Stream? OpenEmbeddedJpegStream(string filePath)
     {
-        var bytes = File.ReadAllBytes(filePath);
-        int totalUshorts = bytes.Length / 2;
+        if (!File.Exists(filePath)) return null;
 
-        int width = 1024;
-        int height = 1024;
+        var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read, 64 * 1024);
+        try
+        {
+            // Check for TIFF / CR2 Header (Little Endian 'II*\0' or Big Endian 'MM\0*')
+            Span<byte> header = stackalloc byte[16];
+            int read = fs.Read(header);
+            if (read >= 16 && header[0] == 0x49 && header[1] == 0x49 && header[2] == 0x2A && header[3] == 0x00)
+            {
+                // CR2 Format: header[8..9] == 'CR', header[10..11] == 0x02
+                if (header[8] == 0x43 && header[9] == 0x52)
+                {
+                    uint ifd3Offset = BitConverter.ToUInt32(header.Slice(12, 4));
+                    if (ifd3Offset > 0 && ifd3Offset < (ulong)fs.Length)
+                    {
+                        fs.Seek(ifd3Offset, SeekOrigin.Begin);
+                        Span<byte> countBuf = stackalloc byte[2];
+                        if (fs.Read(countBuf) == 2)
+                        {
+                            ushort tagCount = BitConverter.ToUInt16(countBuf);
+                            uint jpegOffset = 0;
+
+                            Span<byte> tagBuf = stackalloc byte[12];
+                            for (int i = 0; i < tagCount; i++)
+                            {
+                                if (fs.Read(tagBuf) != 12) break;
+                                ushort tagId = BitConverter.ToUInt16(tagBuf.Slice(0, 2));
+                                if (tagId == 0x0111 || tagId == 0x0201) // StripOffsets or JPEGInterchangeFormat
+                                {
+                                    jpegOffset = BitConverter.ToUInt32(tagBuf.Slice(8, 4));
+                                    break;
+                                }
+                            }
+
+                            if (jpegOffset > 0 && jpegOffset < (ulong)fs.Length)
+                            {
+                                fs.Seek(jpegOffset, SeekOrigin.Begin);
+                                return fs;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // General scanner: Look for JPEG SOI marker (0xFF, 0xD8, 0xFF)
+            fs.Seek(0, SeekOrigin.Begin);
+            byte[] scanBuf = ArrayPool<byte>.Shared.Rent(64 * 1024);
+            try
+            {
+                long pos = 0;
+                while (pos < fs.Length && pos < 64 * 1024 * 1024) // scan up to 64MB
+                {
+                    int bytesRead = fs.Read(scanBuf, 0, scanBuf.Length);
+                    if (bytesRead < 4) break;
+
+                    for (int i = 0; i < bytesRead - 3; i++)
+                    {
+                        if (scanBuf[i] == 0xFF && scanBuf[i + 1] == 0xD8 && scanBuf[i + 2] == 0xFF)
+                        {
+                            fs.Seek(pos + i, SeekOrigin.Begin);
+                            return fs;
+                        }
+                    }
+
+                    pos += bytesRead - 2;
+                    fs.Seek(pos, SeekOrigin.Begin);
+                }
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(scanBuf);
+            }
+
+            fs.Dispose();
+            return null;
+        }
+        catch
+        {
+            fs.Dispose();
+            return null;
+        }
+    }
+
+    public unsafe ImageBuffer<float> LoadRawImage(string filePath, int maxDimension = 0)
+    {
+        // 1. Try decoding embedded JPEG preview if available
+        using (var jpegStream = OpenEmbeddedJpegStream(filePath))
+        {
+            if (jpegStream != null)
+            {
+                try
+                {
+                    using var image = Image.Load<Rgb24>(jpegStream);
+                    if (maxDimension > 0 && (image.Width > maxDimension || image.Height > maxDimension))
+                    {
+                        image.Mutate(x => x.Resize(new ResizeOptions
+                        {
+                            Size = new Size(maxDimension, maxDimension),
+                            Mode = ResizeMode.Max
+                        }));
+                    }
+
+                    int w = image.Width;
+                    int h = image.Height;
+                    var colorBuffer = new ImageBuffer<float>(w, h, 3, PixelFormatType.RgbFloat32);
+                    float* cPtr = colorBuffer.DataPointer;
+
+                    image.ProcessPixelRows(accessor =>
+                    {
+                        for (int y = 0; y < h; y++)
+                        {
+                            var row = accessor.GetRowSpan(y);
+                            int rowOffset = y * w;
+
+                            for (int x = 0; x < w; x++)
+                            {
+                                ref readonly var pixel = ref row[x];
+                                int cIdx = (rowOffset + x) * 3;
+                                cPtr[cIdx] = pixel.R / 255f;
+                                cPtr[cIdx + 1] = pixel.G / 255f;
+                                cPtr[cIdx + 2] = pixel.B / 255f;
+                            }
+                        }
+                    });
+
+                    return colorBuffer;
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Embedded JPEG decode notice: {ex.Message}");
+                }
+            }
+        }
+
+        // 2. Fallback: Demosaic Bayer CFA (preserving standard 3:2 camera sensor aspect ratio)
+        int width = 1280;
+        int height = 853; // standard 3:2 ratio
 
         if (maxDimension > 0)
         {
             width = Math.Min(1280, maxDimension);
-            height = Math.Min(1280, maxDimension);
+            height = Math.Max(2, (int)(width * 2.0 / 3.0));
         }
-        else if (totalUshorts >= 4096 * 3072) { width = 4096; height = 3072; }
-        else if (totalUshorts >= 3840 * 2160) { width = 3840; height = 2160; }
-        else if (totalUshorts >= 1920 * 1080) { width = 1920; height = 1080; }
+        else
+        {
+            long fileLength = new FileInfo(filePath).Length;
+            if (fileLength >= 25 * 1024 * 1024) { width = 5616; height = 3744; } // Canon 5D Mark II native
+            else if (fileLength >= 16 * 1024 * 1024) { width = 3840; height = 2560; }
+            else { width = 1920; height = 1280; }
+        }
+
+        // Width and height must be even for Bayer grid
+        if (width % 2 != 0) width--;
+        if (height % 2 != 0) height--;
 
         var meta = new RawFrameMetadata
         {
@@ -169,14 +317,26 @@ public sealed class RawDecoderEngine : IRawDecoderEngine
             CameraModel = Path.GetFileNameWithoutExtension(filePath)
         };
 
-        var cfaSpan = System.Runtime.InteropServices.MemoryMarshal.Cast<byte, ushort>(bytes.AsSpan(0, Math.Min(bytes.Length, width * height * 2)));
-        if (cfaSpan.Length < width * height)
+        int totalNeeded = width * height * 2;
+        var byteBuf = ArrayPool<byte>.Shared.Rent(totalNeeded);
+        try
         {
-            var padded = new ushort[width * height];
-            cfaSpan.CopyTo(padded);
-            return DemosaicBayerCfa(padded, meta);
-        }
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+            int read = fs.Read(byteBuf, 0, totalNeeded);
+            var cfaSpan = MemoryMarshal.Cast<byte, ushort>(byteBuf.AsSpan(0, read));
 
-        return DemosaicBayerCfa(cfaSpan, meta);
+            if (cfaSpan.Length < width * height)
+            {
+                var padded = new ushort[width * height];
+                cfaSpan.CopyTo(padded);
+                return DemosaicBayerCfa(padded, meta);
+            }
+
+            return DemosaicBayerCfa(cfaSpan.Slice(0, width * height), meta);
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(byteBuf);
+        }
     }
 }
