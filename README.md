@@ -3,13 +3,13 @@
 [![.NET 9.0](https://img.shields.io/badge/.NET-9.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![ZeroGraphics Engine](https://img.shields.io/badge/GPU-Direct3D%2011%20ZeroGraphics-0078D7?logo=directx&logoColor=white)](https://github.com/kzxl/ZeroPlatform)
 [![WPF Studio](https://img.shields.io/badge/GUI-WPF%20Studio%20Dark-blue?logo=windows&logoColor=white)](src/FImageStack.UI/)
-[![Tests](https://img.shields.io/badge/Unit%20Tests-114%2F114%20PASS%20(100%25)-10B981)](#-kiểm-thử--chất-lượng)
+[![Tests](https://img.shields.io/badge/Unit%20Tests-125%2F125%20PASS%20(100%25)-10B981)](#-kiểm-thử--chất-lượng)
 [![Platform](https://img.shields.io/badge/Platform-Windows%20x64%20%7C%20Direct3D%2011-0284C7)](https://github.com/)
 [![License](https://img.shields.io/badge/License-MIT-purple.svg)](LICENSE)
 
 **FImageStack** là một nền tảng **Nhiếp ảnh Tính toán & Đo lường Quang học (Computational Imaging & Industrial Metrology Platform)** thế hệ mới, tối ưu hóa toàn diện cho **Desktop Studio (.NET 9 WPF + Direct3D 11 ZeroGraphics GPU + C++ Native SIMD)**.
 
-Hệ thống tích hợp 9 phân hệ xử lý ảnh tính toán hiện đại: Focus Stacking siêu phân giải vi mô (Macro/Microscopy), Khử nhiễu thống kê đa khung hình (Statistical Noise), HDR dải tương phản cao (Mertens/Debevec), Thiên văn sâu (Astrophotography), Siêu phân giải không gian (HST Subpixel Drizzle), Phục hồi quang học (Deconvolution/Dehazing), Tái tạo mô hình 3D (PLY/OBJ), Ghép chồng dữ liệu thô cảm biến (Computational RAW Bayer Fusion), và Tăng tốc phần cứng GPU Direct3D 11 không độ trễ.
+Hệ thống tích hợp 10 phân hệ xử lý ảnh tính toán hiện đại: Focus Stacking siêu phân giải vi mô (Macro/Microscopy), Khử nhiễu thống kê đa khung hình (Statistical Noise), HDR dải tương phản cao (Mertens/Debevec), Thiên văn sâu (Astrophotography), Siêu phân giải không gian (HST Subpixel Drizzle), Phục hồi quang học (Deconvolution/Dehazing), Ghép nối ma trận đại cảnh (Matrix Mosaic & Panorama Stitching), Tái tạo mô hình 3D (PLY/OBJ), Ghép chồng dữ liệu thô cảm biến (Computational RAW Bayer Fusion), và Tăng tốc phần cứng GPU Direct3D 11 không độ trễ.
 
 ---
 
@@ -24,10 +24,11 @@ FImageStack Desktop Studio & GPU Fusion Architecture
 ├── 4. Astro Deep-Sky ────────── Star Centroid Detector, Asterism Triangles, Dark/Flat Calibration, MTF Auto-Stretch
 ├── 5. Super Resolution ──────── HST Subpixel Drizzle (Variable Pixel Linear Reconstruction) + Multi-frame IBP
 ├── 6. Optical Restoration ───── Richardson-Lucy Deconvolution + TV Damping, Dark Channel Prior Dehazing
-├── 7. 3D Depth Reconstruction ─ Continuous Depth Maps, Sobel Surface Normals, Point Cloud (.ply), 3D Mesh (.obj)
-├── 8. Image Alignment ───────── 6-DOF Affine, 8-DOF Homography, Optical Flow, Elastic Local Mesh Warping
-├── 9. Computational RAW ─────── Bayer CFA Mosaic Fusion trước Demosaic (Google HDR+), Edge-Directed Demosaic
-└── 10. ZeroGraphics Engine ──── D3D11 Compute Shaders, Flip Model SwapChain (sub-4ms), 144Hz Zoom/Pan Viewport
+├── 7. Matrix Mosaic Stitching ── Directional Overlap Matching (NCC), Multi-Tile Planar/Cylindrical, Feather Seam
+├── 8. 3D Depth Reconstruction ─ Continuous Depth Maps, Sobel Surface Normals, Point Cloud (.ply), 3D Mesh (.obj)
+├── 9. Image Alignment ───────── 6-DOF Affine, 8-DOF Homography, Optical Flow, Elastic Local Mesh Warping
+├── 10. Computational RAW ────── Bayer CFA Mosaic Fusion trước Demosaic (Google HDR+), Edge-Directed Demosaic
+└── 11. ZeroGraphics Engine ──── D3D11 Compute Shaders, Flip Model SwapChain (sub-4ms), 144Hz Zoom/Pan Viewport
 ```
 
 ---
@@ -142,6 +143,11 @@ Hệ thống tích hợp trực tiếp kiến trúc **ZeroGraphics GPU Accelerat
 * **Merge-before-Demosaic (Google HDR+ Pipeline)**: Ghép chồng đa khung hình trực tiếp trên lưới lọc Bayer trước khi Demosaicing.
 * **Edge-Directed Adaptive Demosaicing**: Nội suy Green theo gradient bậc 2, nội suy Red/Blue qua trường chênh lệch màu trơn tru.
 
+### 8. 🗺️ Matrix Mosaic & Panorama Stitching (Mở Rộng Phân Giải Đại Cảnh)
+* **Directional Overlap Registration**: Tự động nhận diện và tính toán vùng chồng lấn giữa các mảnh ảnh kề cận theo 4 hướng độc lập (Phải, Trái, Dưới, Trên) qua Normalized Cross-Correlation (NCC) đa tỉ lệ kết hợp Phase Correlation, triệt tiêu 75% nhiễu ngoại lai ngoài biên.
+* **Multi-Tile Global Layout**: Tối ưu hóa ma trận vị trí lưới dịch chuyển tự do ($N \times M$ tiles), tự động ước lượng và mở rộng toàn bộ khung Canvas tổng (`Gigapixel Canvas Extent`).
+* **Distance-Weighted Boundary Feathering**: Hòa trộn mượt mà đường ghép nối (seam boundary) theo hàm trọng số khoảng cách viền bậc mượt (smooth cubic step), triệt tiêu hoàn toàn đường viền lộ vết nối và bảo toàn độ phơi sáng đồng đều giữa các mảnh ảnh.
+
 ---
 
 ## 🎨 Giao Diện Desktop (WPF Studio UI)
@@ -188,6 +194,9 @@ FImageStack.Cli.exe --mode drizzle --input "data/dithered_burst" --output "out/s
 
 # 7. Optical Restoration (Khử sương mù Dehaze & Giải chập Deconvolve)
 FImageStack.Cli.exe --mode restore --input "data/landscape" --output "out/restored.png" --dehaze --deconvolve --psf-radius 2.5
+
+# 8. Matrix Mosaic & Panorama Stitching (Ghép mở rộng ma trận điểm ảnh)
+FImageStack.Cli.exe --mode stitch --input "data/matrix_tiles" --output "out/stitched_mosaic.png" --stitch-projection planar --stitch-blend feather
 ```
 
 ---
@@ -203,7 +212,7 @@ cd FImageStack
 # Build toàn bộ solution
 dotnet build
 
-# Chạy toàn bộ 114 unit tests
+# Chạy toàn bộ 125 unit tests
 dotnet test
 ```
 
@@ -239,7 +248,7 @@ Dự án tích hợp sẵn các bộ dữ liệu chụp thực tế trong thư m
 ## 🧪 Kiểm Thử & Đảm Bảo Chất Lượng
 
 ```text
-Passed!  - Failed: 0, Passed: 114, Skipped: 0, Total: 114, Duration: 658 ms - FImageStack.Core.Tests.dll (net9.0)
+Passed!  - Failed: 0, Passed: 125, Skipped: 0, Total: 125, Duration: 632 ms - FImageStack.Core.Tests.dll (net9.0)
 ```
 
 | Test Suite | Số Lượng Test | Nội dung kiểm thử |
@@ -248,10 +257,11 @@ Passed!  - Failed: 0, Passed: 114, Skipped: 0, Total: 114, Duration: 658 ms - FI
 | **`DrizzleSuperResTests`** | 2 | Tích phân diện tích giao nhau pixel drop, khôi phục lưới siêu phân giải $2\times$ |
 | **`AstroStackTests`** | 3 | Dò tâm sao Gaussian subpixel, khớp tam giác sao asterism, trừ Master Dark/Flat |
 | **`ImageRestorationTests`** | 6 | Tạo hàm PSF, giải chập Richardson-Lucy + TV damping, Dark Channel Dehazing |
+| **`MosaicStitchingTests`** | 3 | Dò translation vùng phủ directional overlap, ghép lưới ma trận 2x2, hòa trộn đường biên seam blend |
 | **`NoiseStackTests`** | 4 | SIMD Mean, Median, $\kappa$-$\sigma$ clipping loại hot pixel, Streaming Welford $O(1)$ |
 | **`HdrStackTests`** | 3 | Mertens exposure fusion, Debevec radiance mapping, tone-mapping ACES Filmic |
 | **`Depth3DTests`** | 3 | Tính pháp vector Sobel Normals, xuất file 3D Point Cloud PLY & Surface Mesh OBJ |
-| **`Focus & Pipeline Tests`** | 90 | Pyramid, Wavelet, Elastic Mesh, Artifact Hunter, Virtual DOF, Tiling, Retouch |
+| **`Focus & Pipeline Tests`** | 98 | Pyramid, Wavelet, Elastic Mesh, Artifact Hunter, Virtual DOF, Tiling, Retouch |
 
 ---
 
